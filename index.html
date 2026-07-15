@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">
+<title>HYC · Générateur de devis</title><link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>/* ============================================================
+   HYC — Générateur de devis · design Hack Your Care
+   Vert émeraude « santé », cartes arrondies, fil d'étapes,
+   langage visuel « argent qui entre (vert) / qui sort (neutre) ».
+   ============================================================ */
+
+:root {
+  /* marque HYC */
+  --brand: #0CA678;          /* émeraude principal */
+  --brand-deep: #08624C;     /* vert profond (texte/logo) */
+  --brand-700: #0A7F63;
+  --brand-050: #E9F9F2;
+  --brand-100: #CDEFE1;
+  --brand-glow: rgba(12,166,120,.14);
+
+  --ink: #10221E;
+  --ink-soft: #46574F;
+  --muted: #7A8A82;
+  --paper: #F3F7F5;
+  --surface: #ffffff;
+  --line: #E4EDE9;
+  --line-strong: #CBDAD4;
+
+  /* coûts = neutre ardoise (argent qui sort, sans alarmer) */
+  --slate: #5B6B72;
+  --slate-050: #F1F5F5;
+  --slate-100: #E3EAEB;
+
+  /* verdicts de marge */
+  --green: #157F3B;  --green-bg: #E7F4EC;  --green-bd: #BEDCC9;
+  --amber: #A96B12;  --amber-bg: #FBF2E1;  --amber-bd: #ECD5A6;
+  --orange: #BC4E1B; --orange-bg: #FBEADF; --orange-bd: #EFC6AC;
+  --red: #B3261E;    --red-bg: #FBECEB;    --red-bd: #EEC2BF;
+
+  --shadow-sm: 0 1px 2px rgba(16,34,30,.05);
+  --shadow: 0 2px 4px rgba(16,34,30,.05), 0 12px 30px rgba(16,34,30,.07);
+  --shadow-lg: 0 10px 40px rgba(8,98,76,.16);
+  --r-lg: 18px; --r-md: 12px; --r-sm: 9px;
+  --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; font-family: var(--font); font-size: 15px; line-height: 1.5; color: var(--ink);
+  background:
+    radial-gradient(1200px 380px at 50% -120px, var(--brand-050) 0%, rgba(233,249,242,0) 70%),
+    var(--paper);
+}
+h1,h2,h3,h4 { margin: 0; font-weight: 600; letter-spacing: -.015em; }
+a { color: var(--brand-deep); }
+button { font-family: inherit; }
+input, select, textarea {
+  font-family: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm); padding: 9px 11px; transition: border-color .12s, box-shadow .12s;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-glow);
+}
+button:focus-visible, summary:focus-visible, [role=tab]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+input[type=number] { font-family: var(--mono); font-size: 13.5px; }
+input:disabled { background: #f0f4f2; color: var(--muted); }
+::placeholder { color: #9fb0a9; }
+
+/* ---------- structure ---------- */
+.app { max-width: 1300px; margin: 0 auto; padding: 0 22px 96px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 16px;
+  padding: 14px 0; margin-bottom: 20px;
+  background: linear-gradient(var(--paper), var(--paper) 70%, rgba(243,247,245,.75));
+  backdrop-filter: blur(6px); border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark {
+  width: 40px; height: 40px; border-radius: 12px; flex: none;
+  background: linear-gradient(140deg, var(--brand) 0%, var(--brand-deep) 100%);
+  color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px;
+  letter-spacing: .02em; box-shadow: var(--shadow-lg);
+}
+.brand-title { font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
+.brand-sub { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.topbar-spacer { flex: 1; }
+
+.chip {
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--brand-100); color: var(--brand-deep); background: var(--brand-050); white-space: nowrap;
+}
+.chip.warn { border-color: #ecd5a6; background: var(--amber-bg); color: var(--amber); }
+
+.viewswitch { display: inline-flex; gap: 3px; background: var(--slate-050); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.viewswitch button {
+  border: 0; background: transparent; padding: 8px 18px; border-radius: 999px;
+  font-weight: 600; font-size: 13.5px; color: var(--ink-soft); cursor: pointer; transition: .12s;
+}
+.viewswitch button:hover { color: var(--brand-deep); }
+.viewswitch button[aria-current=true] { background: var(--surface); color: var(--brand-deep); box-shadow: var(--shadow-sm); }
+
+.layout { display: grid; grid-template-columns: minmax(0,1fr) 384px; gap: 24px; align-items: start; }
+
+/* ---------- fil d'étapes ---------- */
+.stepnav { grid-column: 1 / -1; display: flex; gap: 8px; margin-bottom: 2px; flex-wrap: wrap; }
+.stepnav a {
+  display: inline-flex; align-items: center; gap: 9px; text-decoration: none;
+  padding: 8px 14px 8px 8px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-soft); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-sm);
+}
+.stepnav a .n {
+  width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--slate-100); color: var(--slate); font-family: var(--mono); font-size: 11px; font-weight: 600;
+}
+.stepnav a.active { border-color: var(--brand); color: var(--brand-deep); }
+.stepnav a.active .n { background: var(--brand); color: #fff; }
+.stepnav a.done .n { background: var(--brand-100); color: var(--brand-deep); }
+
+/* ---------- cartes / étapes ---------- */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
+.step { scroll-margin-top: 84px; }
+.step-head { display: flex; align-items: flex-start; gap: 14px; padding: 18px 20px 14px; }
+.step-badge {
+  width: 34px; height: 34px; border-radius: 11px; flex: none; display: grid; place-items: center;
+  font-weight: 700; font-family: var(--mono); font-size: 15px; margin-top: 1px;
+}
+.step-badge.rev { background: var(--brand); color: #fff; box-shadow: 0 4px 12px var(--brand-glow); }
+.step-badge.cost { background: var(--slate-100); color: var(--slate); }
+.step-badge.mission { background: var(--brand-050); color: var(--brand-deep); border: 1px solid var(--brand-100); }
+.step-head h2 { font-size: 16px; }
+.step-head .sub { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.step-head .tot { margin-left: auto; text-align: right; font-family: var(--mono); }
+.step-head .tot .lab { display: block; font-family: var(--font); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.step-head .tot .amt { font-size: 16px; font-weight: 600; }
+.step-head .tot.rev .amt { color: var(--brand-deep); }
+.step-head .tot.cost .amt { color: var(--slate); }
+.step-body { padding: 4px 20px 18px; }
+
+.tag-int {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+  color: var(--slate); background: var(--slate-050); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px;
+}
+.tag-int::before { content: "•"; color: var(--slate); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.field .help { font-size: 11.5px; color: var(--muted); }
+.field input, .field select { width: 100%; }
+
+.search {
+  width: 100%; padding: 10px 14px 10px 38px; border-radius: 10px; border: 1px solid var(--line-strong); background: #fbfdfc
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A8A82' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") 12px center no-repeat;
+}
+
+/* ---------- catalogue (revenue) ---------- */
+.cat { border-top: 1px solid var(--line); }
+.cat:first-of-type { border-top: 0; }
+.cat > summary {
+  list-style: none; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px;
+  padding: 12px 4px; font-weight: 600; font-size: 14px;
+}
+.cat > summary::-webkit-details-marker { display: none; }
+.cat > summary .caret { color: var(--muted); font-size: 10px; transition: transform .15s; }
+.cat[open] > summary .caret { transform: rotate(90deg); }
+.cat > summary .count { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.cat > summary .picked { font-family: var(--mono); font-size: 11px; color: var(--brand-deep); background: var(--brand-050); border: 1px solid var(--brand-100); border-radius: 999px; padding: 2px 9px; }
+
+.prod-row { display: grid; grid-template-columns: minmax(0,1fr) 118px 84px 92px; gap: 10px; align-items: center; padding: 9px 6px; border-top: 1px dashed var(--line); border-radius: 8px; }
+.prod-row:hover { background: #fafcfb; }
+.prod-row.is-on { background: var(--brand-050); border-top-color: transparent; box-shadow: inset 2px 0 0 var(--brand); }
+.prod-label { display: flex; gap: 11px; align-items: flex-start; min-width: 0; cursor: pointer; }
+.prod-label input[type=checkbox] { margin-top: 2px; width: 17px; height: 17px; accent-color: var(--brand); flex: none; cursor: pointer; }
+.prod-label .txt { min-width: 0; }
+.prod-label .name { font-size: 13.5px; font-weight: 600; }
+.prod-label .desc { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prod-pu { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); text-align: right; white-space: nowrap; }
+.prod-pu .unit { color: var(--muted); }
+.prod-qty input { width: 100%; text-align: right; }
+.prod-total { font-family: var(--mono); font-size: 13px; font-weight: 600; text-align: right; white-space: nowrap; color: var(--brand-deep); }
+.prod-total.zero { color: var(--line-strong); font-weight: 400; }
+.warn-zero { color: var(--orange); font-size: 11.5px; font-family: var(--mono); }
+
+/* ---------- blocs coûts ---------- */
+.costblock { border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px; margin-bottom: 14px; background: #fcfdfd; }
+.costblock:last-child { margin-bottom: 0; }
+.costblock-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.costblock-head h3 { font-size: 13.5px; font-weight: 600; }
+.costblock-head .bsub { font-size: 11.5px; color: var(--muted); }
+.costblock-head .btot { margin-left: auto; font-family: var(--mono); font-size: 13.5px; font-weight: 600; color: var(--slate); }
+
+.dyn-list { display: flex; flex-direction: column; gap: 10px; }
+.dyn-row { display: grid; gap: 9px; align-items: end; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.dyn-row .field > label { font-size: 11px; }
+.dyn-row .line-total { font-family: var(--mono); font-size: 13px; text-align: right; align-self: end; padding-bottom: 8px; white-space: nowrap; color: var(--slate); }
+.dyn-row .line-total b { color: var(--ink); }
+.dyn-row .rm { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 8px 6px; align-self: end; border-radius: 6px; }
+.dyn-row .rm:hover { color: var(--red); background: var(--red-bg); }
+.row-pds { grid-template-columns: 140px minmax(0,1.3fr) minmax(0,1fr) 88px 116px 30px; }
+.row-gestion { grid-template-columns: minmax(0,1fr) 120px 88px 116px 30px; }
+.empty { color: var(--muted); font-size: 13px; margin: 2px 0 0; }
+
+.fee-row { display: grid; grid-template-columns: minmax(0,1fr) 118px 84px 92px; gap: 10px; align-items: center; padding: 9px 4px; border-top: 1px dashed var(--line); }
+.fee-row:first-child { border-top: 0; }
+.fee-row .prod-total { color: var(--slate); }
+
+/* ---------- boutons ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: 9px 15px; border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: .12s; }
+.btn:hover { border-color: var(--brand); color: var(--brand-deep); }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 6px 16px var(--brand-glow); }
+.btn-primary:hover { background: var(--brand-deep); border-color: var(--brand-deep); color: #fff; }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--ink-soft); }
+.btn-ghost:hover { color: var(--red); background: var(--red-bg); }
+.btn-add { border-style: dashed; color: var(--brand-deep); background: var(--brand-050); border-color: var(--brand-100); }
+.btn-add:hover { background: var(--brand-100); }
+.btn-sm { padding: 7px 12px; font-size: 12.5px; }
+
+/* ---------- panneau récap (sticky) ---------- */
+.summary { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 16px; }
+.rc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.rc-head { padding: 14px 18px 0; }
+.rc-head .eyebrow { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); }
+.rc-head h3 { font-size: 15px; margin-top: 3px; }
+.rc-body { padding: 14px 18px 18px; }
+
+/* prix */
+.price-lab { font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+.price-input { display: flex; align-items: center; gap: 8px; margin: 7px 0 4px; }
+.price-input input { flex: 1; font-family: var(--mono); font-size: 22px; font-weight: 600; text-align: right; padding: 10px 12px; color: var(--brand-deep); }
+.price-input .cur { font-family: var(--mono); color: var(--muted); font-weight: 600; }
+.price-cap { font-size: 12px; color: var(--muted); }
+.price-cap b { color: var(--ink-soft); font-family: var(--mono); }
+.price-reset { font-size: 12px; color: var(--brand-deep); background: none; border: 0; cursor: pointer; padding: 4px 0 0; }
+.price-reset:hover { text-decoration: underline; }
+.ttc { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 5px; }
+.tc-row { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); }
+.tc-row .v { font-family: var(--mono); }
+.tc-row.big { font-size: 13.5px; color: var(--ink); font-weight: 600; }
+.tc-row.big .v { color: var(--brand-deep); }
+
+/* deux indicateurs (taux de marque / taux de marge) */
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.kpi { display: flex; flex-direction: column; gap: 2px; border-radius: 12px; padding: 11px 13px; border: 1px solid var(--line); background: var(--slate-050); }
+.kpi .kl { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); }
+.kpi .kv { font-family: var(--mono); font-size: 23px; font-weight: 600; line-height: 1.1; }
+.kpi .ko { font-size: 10.5px; color: var(--muted); }
+.kpi .ko b { font-family: var(--mono); }
+.kpi.v-green { background: var(--green-bg); border-color: var(--green-bd); } .kpi.v-green .kv, .kpi.v-green .kl { color: var(--green); }
+.kpi.v-amber { background: var(--amber-bg); border-color: var(--amber-bd); } .kpi.v-amber .kv, .kpi.v-amber .kl { color: var(--amber); }
+.kpi.v-orange { background: var(--orange-bg); border-color: var(--orange-bd); } .kpi.v-orange .kv, .kpi.v-orange .kl { color: var(--orange); }
+.kpi.v-red { background: var(--red-bg); border-color: var(--red-bd); } .kpi.v-red .kv, .kpi.v-red .kl { color: var(--red); }
+.kpi.v-none .kv { color: var(--muted); }
+.rc-row .w { font-style: normal; font-size: 10.5px; color: var(--muted); font-family: var(--mono); margin-left: 6px; }
+.rc-row.sub { color: var(--slate); font-weight: 600; }
+.rc-row.sub .v { color: var(--slate); }
+.floor { font-size: 12px; color: var(--ink-soft); background: var(--slate-050); border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; margin-top: 4px; }
+.floor b { color: var(--brand-deep); font-family: var(--mono); }
+
+.rc-rows { display: flex; flex-direction: column; gap: 8px; }
+.rc-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-soft); align-items: baseline; }
+.rc-row .v { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.rc-row.rev .v { color: var(--brand-deep); font-weight: 600; }
+.rc-row.cost .v { color: var(--slate); }
+.rc-sep { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.rc-row.gross { font-size: 14px; color: var(--ink); font-weight: 700; }
+.rc-row.gross .v { font-size: 14px; }
+
+.rc-actions { display: flex; flex-direction: column; gap: 9px; padding: 4px 2px 0; }
+.mode-opts { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: var(--ink-soft); flex-wrap: wrap; padding: 2px 0 4px; }
+.mode-opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.mode-opts input { accent-color: var(--brand); }
+
+/* ---------- admin ---------- */
+.note { font-size: 13px; color: var(--ink-soft); background: var(--brand-050); border: 1px solid var(--brand-100); border-radius: var(--r-md); padding: 12px 15px; margin-bottom: 18px; }
+.note b { color: var(--brand-deep); }
+.tabs { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 18px; }
+.tab { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink-soft); border-radius: 999px; padding: 8px 15px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: var(--shadow-sm); }
+.tab[aria-selected=true] { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 5px 14px var(--brand-glow); }
+.panel { display: none; } .panel.on { display: block; }
+.acard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.acard-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 15px 20px; border-bottom: 1px solid var(--line); }
+.acard-head h2 { font-size: 15.5px; } .acard-head .hint { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+.acard-body { padding: 12px 20px 18px; }
+.table-scroll { overflow-x: auto; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.grid th { text-align: left; font-size: 10.5px; font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; padding: 9px 8px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+table.grid td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.grid input, table.grid select { width: 100%; min-width: 62px; padding: 7px 9px; }
+table.grid input.num { text-align: right; max-width: 116px; }
+table.grid .rm { border: 0; background: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 4px 7px; border-radius: 6px; }
+table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
+
+.savebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: rgba(255,255,255,.94); border-top: 1px solid var(--line); backdrop-filter: blur(8px); }
+.savebar-in { max-width: 1300px; margin: 0 auto; padding: 12px 22px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.savebar .status { font-size: 12.5px; color: var(--muted); margin-left: auto; }
+.savebar .status.saved { color: var(--green); }
+
+/* ---------- toast ---------- */
+.toast { position: fixed; bottom: 78px; left: 50%; transform: translateX(-50%) translateY(8px); background: var(--ink); color: #fff; font-size: 13.5px; font-weight: 500; border-radius: 10px; padding: 11px 17px; opacity: 0; pointer-events: none; transition: .18s; z-index: 70; box-shadow: var(--shadow-lg); }
+.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1040px) {
+  .layout { grid-template-columns: 1fr; }
+  .summary { position: static; }
+  .row-pds { grid-template-columns: 1fr 1fr; }
+  .row-gestion { grid-template-columns: 1fr 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .prod-row { grid-template-columns: minmax(0,1fr) 80px 80px; }
+  .prod-pu { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ============================================================
+   IMPRESSION — devis client (sobre, blanc, accent vert discret)
+   ============================================================ */
+#printRoot { display: none; }
+@media print {
+  @page { size: A4; margin: 15mm 15mm; }
+  body { background: #fff; }
+  .app, .toast, .savebar { display: none !important; }
+  #printRoot { display: block; font-family: var(--font); color: #14201d; font-size: 11.5pt; }
+  .pq-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 14px; border-bottom: 2.5pt solid var(--brand); }
+  .pq-brand { font-weight: 700; letter-spacing: .04em; font-size: 15pt; color: var(--brand-deep); }
+  .pq-brand small { display: block; font-weight: 400; letter-spacing: 0; color: #566; font-size: 8.5pt; margin-top: 4px; white-space: pre-line; }
+  .pq-meta { text-align: right; }
+  .pq-meta .doc { font-size: 18pt; font-weight: 700; letter-spacing: .05em; color: var(--brand-deep); }
+  .pq-meta div { font-size: 9.5pt; color: #445; } .pq-meta .ref { font-family: var(--mono); }
+  .pq-parties { display: flex; justify-content: flex-end; margin: 0 0 18px; }
+  .pq-client { border: 1px solid #ccd; border-radius: 8px; padding: 10px 14px; min-width: 230px; }
+  .pq-client .lbl { font-size: 8pt; text-transform: uppercase; letter-spacing: .09em; color: #789; }
+  .pq-client .name { font-weight: 700; font-size: 11.5pt; }
+  .pq-object { margin: 0 0 14px; font-size: 11.5pt; } .pq-object b { font-weight: 600; }
+  table.pq { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  table.pq th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .07em; color: #566; border-bottom: 1.5pt solid var(--brand-deep); padding: 7px 6px; }
+  table.pq th.num, table.pq td.num { text-align: right; white-space: nowrap; font-family: var(--mono); font-size: 10pt; }
+  table.pq td { padding: 8px 6px; border-bottom: .5pt solid #dde; vertical-align: top; }
+  table.pq .des { font-weight: 600; }
+  table.pq .dsc { font-size: 9pt; color: #566; margin-top: 2px; }
+  .pq-totals { display: flex; justify-content: flex-end; margin-bottom: 22px; }
+  .pq-totals table { border-collapse: collapse; min-width: 250px; }
+  .pq-totals td { padding: 6px 8px; font-size: 10.5pt; } .pq-totals td.num { text-align: right; font-family: var(--mono); }
+  .pq-totals tr.tt td { border-top: 1.5pt solid var(--brand-deep); font-weight: 700; font-size: 12.5pt; padding-top: 9px; color: var(--brand-deep); }
+  .pq-foot { font-size: 9pt; color: #566; border-top: .5pt solid #ccd; padding-top: 10px; margin-bottom: 26px; white-space: pre-line; }
+  .pq-sign { display: flex; justify-content: space-between; gap: 28px; }
+  .pq-sign .box { flex: 1; border: .5pt solid #99a; border-radius: 8px; min-height: 82px; padding: 8px 11px; font-size: 9pt; color: #566; }
+}
+</style></head>
+<body><div class="app"><header class="topbar"><div class="brand"><span class="brand-mark">HYC</span>
+<div><div class="brand-title">Générateur de devis</div><div class="brand-sub">Hack Your Care · CA, charges et marge en un coup d’œil</div></div></div>
+<div class="topbar-spacer"></div><span id="dataChip" class="chip">Aperçu</span>
+<div class="viewswitch" role="tablist" aria-label="Choisir la vue"><button data-view="devis" aria-current="true">Devis</button><button data-view="admin" aria-current="false">Tarifs</button></div>
+</header><main id="view" class="layout"></main></div><div id="printRoot"></div><div id="toast" class="toast" role="status"></div>
+<script>const DEFAULT = {
+  "version": 1,
+  "settings": {
+    "company": "Hack Your Care",
+    "emitterBlock": "Hack Your Care\nCommunauté de 6 000+ professionnels de santé",
+    "tvaRate": 20,
+    "validityDays": 30,
+    "objectifTauxMarge": 60,
+    "objectifTauxMarque": 40,
+    "quoteFooter": "Devis valable {validite} jours à compter de sa date d'émission. Prix exprimés hors taxes. Règlement à 30 jours à réception de facture.",
+    "pin": "hyc2026",
+    "sheetWebhookUrl": ""
+  },
+  "projectTypes": [
+    {
+      "id": "formation",
+      "label": "Formation",
+      "margeVisee": 30,
+      "margeAcceptable": 20,
+      "margeDegradee": 10
+    },
+    {
+      "id": "expertise",
+      "label": "Expertise (outplacement / recrutement)",
+      "margeVisee": 30,
+      "margeAcceptable": 20,
+      "margeDegradee": 10
+    },
+    {
+      "id": "communication",
+      "label": "Communication",
+      "margeVisee": 40,
+      "margeAcceptable": 30,
+      "margeDegradee": 20
+    },
+    {
+      "id": "marketing",
+      "label": "Marketing",
+      "margeVisee": 40,
+      "margeAcceptable": 30,
+      "margeDegradee": 20
+    }
+  ],
+  "categories": [
+    "Expertise (outplacement / recrutement)",
+    "Communication",
+    "Formation et accompagnement",
+    "Marketing et rédaction"
+  ],
+  "products": [
+    {
+      "id": "fg-med-spe",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Focus group - Médical et spécialiste",
+      "unit": "heure",
+      "price": 600,
+      "description": "Animation d'un focus group réunissant des médecins et spécialistes (France)."
+    },
+    {
+      "id": "fg-para",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Focus group - Paramédical",
+      "unit": "heure",
+      "price": 400,
+      "description": "Animation d'un focus group réunissant des professionnels paramédicaux."
+    },
+    {
+      "id": "fg-us",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Focus group - US",
+      "unit": "heure",
+      "price": 1000,
+      "description": "Focus group avec des professionnels de santé exerçant aux États-Unis."
+    },
+    {
+      "id": "fg-europe",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Focus group - Europe (hors France)",
+      "unit": "heure",
+      "price": 800,
+      "description": "Focus group avec des professionnels de santé européens (hors France)."
+    },
+    {
+      "id": "rec-inv-med",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Investigateurs cliniques - Médical",
+      "unit": "unité",
+      "price": 1600,
+      "description": "Sourcing, qualification et mise en relation d'un investigateur clinique médical."
+    },
+    {
+      "id": "rec-inv-para",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Investigateurs cliniques - Paramédical",
+      "unit": "unité",
+      "price": 1200,
+      "description": "Sourcing, qualification et mise en relation d'un investigateur clinique paramédical."
+    },
+    {
+      "id": "rec-assoc-med",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Associés et cofondateurs - Médical",
+      "unit": "unité",
+      "price": 8000,
+      "description": "Recherche, évaluation et recrutement d'un associé ou cofondateur médical."
+    },
+    {
+      "id": "rec-assoc-para",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Associés et cofondateurs - Paramédical",
+      "unit": "unité",
+      "price": 5000,
+      "description": "Recherche, évaluation et recrutement d'un associé ou cofondateur paramédical."
+    },
+    {
+      "id": "rec-board-med",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Board scientifique - Médical",
+      "unit": "unité",
+      "price": 3000,
+      "description": "Identification et recrutement d'un membre médical pour un board scientifique."
+    },
+    {
+      "id": "rec-board-para",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Board scientifique - Paramédical",
+      "unit": "unité",
+      "price": 1500,
+      "description": "Identification et recrutement d'un membre paramédical pour un board scientifique."
+    },
+    {
+      "id": "rec-jour-prev",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Journée de prévention",
+      "unit": "unité",
+      "price": 1100,
+      "description": "Mobilisation de professionnels de santé pour une journée de prévention."
+    },
+    {
+      "id": "rec-demi-prev",
+      "category": "Expertise (outplacement / recrutement)",
+      "label": "Recrutement - Demi-journée de prévention",
+      "unit": "unité",
+      "price": 650,
+      "description": "Mobilisation de professionnels de santé pour une demi-journée de prévention."
+    },
+    {
+      "id": "com-linkedin",
+      "category": "Communication",
+      "label": "Article LinkedIn",
+      "unit": "unité",
+      "price": 300,
+      "description": "Rédaction et publication d'un article LinkedIn."
+    },
+    {
+      "id": "com-whatsapp",
+      "category": "Communication",
+      "label": "Message sur groupe WhatsApp",
+      "unit": "unité",
+      "price": 300,
+      "description": "Diffusion d'un message ciblé sur les groupes WhatsApp de la communauté HYC."
+    },
+    {
+      "id": "com-newsletter",
+      "category": "Communication",
+      "label": "Newsletter",
+      "unit": "unité",
+      "price": 500,
+      "description": "Conception, rédaction et envoi d'une newsletter."
+    },
+    {
+      "id": "com-intervention",
+      "category": "Communication",
+      "label": "Intervention d'un expert (réel / vidéo)",
+      "unit": "unité",
+      "price": 1500,
+      "description": "Intervention d'un professionnel de santé expert, en présentiel ou en vidéo (facturée au client)."
+    },
+    {
+      "id": "form-para",
+      "category": "Formation et accompagnement",
+      "label": "Formation - Paramédical",
+      "unit": "unité",
+      "price": 5500,
+      "description": "Conception complète d'un module de formation destiné aux professionnels paramédicaux."
+    },
+    {
+      "id": "form-mg",
+      "category": "Formation et accompagnement",
+      "label": "Formation - Médecin généraliste",
+      "unit": "unité",
+      "price": 7200,
+      "description": "Conception complète d'un module de formation destiné aux médecins généralistes."
+    },
+    {
+      "id": "form-ms",
+      "category": "Formation et accompagnement",
+      "label": "Formation - Médecin spécialiste",
+      "unit": "unité",
+      "price": 8300,
+      "description": "Conception complète d'un module de formation destiné aux médecins spécialistes."
+    },
+    {
+      "id": "form-tournage",
+      "category": "Formation et accompagnement",
+      "label": "Formation - Tournage (organisation, réalisation, montage)",
+      "unit": "unité",
+      "price": 3000,
+      "description": "Organisation, réalisation et montage vidéo du tournage de la formation."
+    },
+    {
+      "id": "form-dpc",
+      "category": "Formation et accompagnement",
+      "label": "Agrément DPC",
+      "unit": "unité",
+      "price": 1200,
+      "description": "Constitution et dépôt du dossier d'agrément DPC de la formation."
+    },
+    {
+      "id": "form-comite",
+      "category": "Formation et accompagnement",
+      "label": "Qualification - Membre d'un comité scientifique",
+      "unit": "unité",
+      "price": 500,
+      "description": "Identification et qualification d'un membre de comité scientifique."
+    },
+    {
+      "id": "anim-j-ms",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation journée (7h) - Médecin spécialiste",
+      "unit": "unité",
+      "price": 1800,
+      "description": "Animation d'une journée de formation (7 h) par un médecin spécialiste."
+    },
+    {
+      "id": "anim-j-mg",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation journée (7h) - Médecin généraliste",
+      "unit": "unité",
+      "price": 1320,
+      "description": "Animation d'une journée de formation (7 h) par un médecin généraliste."
+    },
+    {
+      "id": "anim-j-para",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation journée (7h) - Paramédical",
+      "unit": "unité",
+      "price": 600,
+      "description": "Animation d'une journée de formation (7 h) par un professionnel paramédical."
+    },
+    {
+      "id": "anim-dj-ms",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation demi-journée (4h) - Médecin spécialiste",
+      "unit": "unité",
+      "price": 960,
+      "description": "Animation d'une demi-journée de formation (4 h) par un médecin spécialiste."
+    },
+    {
+      "id": "anim-dj-mg",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation demi-journée (4h) - Médecin généraliste",
+      "unit": "unité",
+      "price": 720,
+      "description": "Animation d'une demi-journée de formation (4 h) par un médecin généraliste."
+    },
+    {
+      "id": "anim-dj-para",
+      "category": "Formation et accompagnement",
+      "label": "Animation - Formation demi-journée (4h) - Paramédical",
+      "unit": "unité",
+      "price": 360,
+      "description": "Animation d'une demi-journée de formation (4 h) par un professionnel paramédical."
+    },
+    {
+      "id": "form-congres",
+      "category": "Formation et accompagnement",
+      "label": "Organisation de congrès",
+      "unit": "unité",
+      "price": 0,
+      "description": "Organisation d'un congrès professionnel (périmètre et tarif à définir)."
+    },
+    {
+      "id": "mkt-etude",
+      "category": "Marketing et rédaction",
+      "label": "Etude de marché (10 PdS)",
+      "unit": "unité",
+      "price": 7800,
+      "description": "Étude de marché menée auprès d'un panel de 10 professionnels de santé."
+    },
+    {
+      "id": "mkt-article",
+      "category": "Marketing et rédaction",
+      "label": "Article (1000 mots)",
+      "unit": "unité",
+      "price": 600,
+      "description": "Rédaction d'un article de 1 000 mots."
+    },
+    {
+      "id": "mkt-article-pds",
+      "category": "Marketing et rédaction",
+      "label": "Article validé PdS (1000 mots)",
+      "unit": "unité",
+      "price": 1000,
+      "description": "Rédaction d'un article de 1 000 mots relu et validé par un professionnel de santé."
+    },
+    {
+      "id": "mkt-qualif-pds",
+      "category": "Marketing et rédaction",
+      "label": "Qualification - Professionnel de santé",
+      "unit": "unité",
+      "price": 500,
+      "description": "Identification et qualification d'un professionnel de santé."
+    }
+  ],
+  "pdsForfait": [
+    {
+      "id": "pf-relecture-formation",
+      "projectType": "Formation",
+      "label": "Relecture formation",
+      "rates": {
+        "generaliste": 0,
+        "specialiste": 0,
+        "paramedical": 0
+      }
+    },
+    {
+      "id": "pf-relecture-article",
+      "projectType": "Communication",
+      "label": "Relecture article",
+      "rates": {
+        "generaliste": 0,
+        "specialiste": 0,
+        "paramedical": 0
+      }
+    },
+    {
+      "id": "pf-animation-formation",
+      "projectType": "Formation",
+      "label": "Animation de formation",
+      "rates": {
+        "generaliste": 1200,
+        "specialiste": 1600,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-conception-formation",
+      "projectType": "Formation",
+      "label": "Conception de formation",
+      "rates": {
+        "generaliste": 1000,
+        "specialiste": 1200,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-relecture-linkedin",
+      "projectType": "Communication",
+      "label": "Relecture post LinkedIn",
+      "rates": {
+        "generaliste": 0,
+        "specialiste": 0,
+        "paramedical": 0
+      }
+    },
+    {
+      "id": "pf-enquete",
+      "projectType": "Marketing",
+      "label": "Participation à une enquête",
+      "rates": {
+        "generaliste": 0,
+        "specialiste": 0,
+        "paramedical": 0
+      }
+    },
+    {
+      "id": "pf-eval-techno",
+      "projectType": "Expertise",
+      "label": "Evaluation d'une technologie",
+      "rates": {
+        "generaliste": 1200,
+        "specialiste": 1600,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-animation-conf",
+      "projectType": "Formation",
+      "label": "Animation conférence",
+      "rates": {
+        "generaliste": 1000,
+        "specialiste": 1200,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-enregistrement",
+      "projectType": "Formation",
+      "label": "Enregistrement formation",
+      "rates": {
+        "generaliste": 1200,
+        "specialiste": 1600,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-conseil-strat",
+      "projectType": "Expertise",
+      "label": "Conseil stratégique",
+      "rates": {
+        "generaliste": 1000,
+        "specialiste": 1200,
+        "paramedical": 800
+      }
+    },
+    {
+      "id": "pf-relecture-news",
+      "projectType": "Communication",
+      "label": "Relecture newsletter",
+      "rates": {
+        "generaliste": 1100,
+        "specialiste": 1400,
+        "paramedical": 900
+      }
+    },
+    {
+      "id": "pf-video-pharma",
+      "projectType": "Marketing",
+      "label": "Vidéo pour client pharma",
+      "rates": {
+        "generaliste": 1250,
+        "specialiste": 1500,
+        "paramedical": 900
+      }
+    }
+  ],
+  "pdsGroups": [
+    {
+      "id": "generaliste",
+      "label": "Médecin généraliste"
+    },
+    {
+      "id": "specialiste",
+      "label": "Médecin spécialiste"
+    },
+    {
+      "id": "paramedical",
+      "label": "Paramédical"
+    }
+  ],
+  "pdsProfiles": [
+    {
+      "id": "medecin-generaliste",
+      "label": "Médecin généraliste",
+      "group": "generaliste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "medecin-specialiste",
+      "label": "Médecin spécialiste",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "praticien-hosp",
+      "label": "Praticien hospitalier",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "prof-univ",
+      "label": "Professeur des universités",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "kine",
+      "label": "Masseur / Kinésithérapeute",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "dentiste",
+      "label": "Chirurgien dentiste",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "pharmacien",
+      "label": "Pharmacien",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "infirmiere",
+      "label": "Infirmière",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "cadre-sante",
+      "label": "Cadre de santé",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "aide-soignante",
+      "label": "Aide-soignante",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "ambulancier",
+      "label": "Ambulancier",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "sage-femme",
+      "label": "Sage-femme",
+      "group": "generaliste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "podologue",
+      "label": "Pédicure-podologue",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "veterinaire",
+      "label": "Vétérinaire",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "biologiste",
+      "label": "Biologiste médical",
+      "group": "specialiste",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "ash",
+      "label": "Agent de service hospitalier (ASH)",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "prep-pharma",
+      "label": "Préparateur en pharmacie",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    },
+    {
+      "id": "ibode",
+      "label": "Infirmier de bloc",
+      "group": "paramedical",
+      "rateHour": 0,
+      "rateDay": 0
+    }
+  ],
+  "team": [
+    {
+      "id": "arthur",
+      "label": "Arthur",
+      "rateHour": 150,
+      "rateDay": 1050
+    },
+    {
+      "id": "anis",
+      "label": "Anis",
+      "rateHour": 125,
+      "rateDay": 875
+    },
+    {
+      "id": "catherine",
+      "label": "Catherine",
+      "rateHour": 175,
+      "rateDay": 1225
+    },
+    {
+      "id": "pierre",
+      "label": "Pierre",
+      "rateHour": 200,
+      "rateDay": 1400
+    },
+    {
+      "id": "solene",
+      "label": "Solène",
+      "rateHour": 250,
+      "rateDay": 1750
+    }
+  ],
+  "fees": [
+    {
+      "id": "recrutement-pds",
+      "label": "Recrutement / sourcing PdS",
+      "unit": "forfait",
+      "cost": 500,
+      "description": "Frais de sourcing et de recrutement des professionnels de santé mobilisés."
+    },
+    {
+      "id": "deplacement",
+      "label": "Déplacement (forfait jour)",
+      "unit": "jour",
+      "cost": 400,
+      "description": "Frais de déplacement, forfait journalier."
+    },
+    {
+      "id": "montage-video",
+      "label": "Montage vidéo",
+      "unit": "forfait",
+      "cost": 600,
+      "description": "Montage et post-production vidéo."
+    }
+  ]
+};</script><script>/* HYC — Générateur de devis (aperçu 1 fichier)
+   Modèle : catalogue = prix de vente (CA) ; PdS + gestion + frais = coûts internes.
+   Marge = (prix de vente − coûts) / prix de vente. DEFAULT injecté avant ce script. */
+(function () {
+  "use strict";
+
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const deepClone = o => JSON.parse(JSON.stringify(o));
+  const round2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+  function parseNum(v) { if (typeof v === "number") return isFinite(v) ? v : 0; if (v == null) return 0; const n = parseFloat(String(v).replace(/\s/g, "").replace(",", ".")); return isFinite(n) ? n : 0; }
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
+  const eurFmt = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const eurFmt2 = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtEUR = n => eurFmt.format(round2(n));
+  const fmtEUR2 = n => eurFmt2.format(round2(n));
+  function fmtPct(n) { const v = Math.round(n * 10) / 10; return (Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1)).replace(".", ",") + " %"; }
+  const todayFR = () => new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const uid = p => (p || "id") + "-" + Math.random().toString(36).slice(2, 8);
+  const shortUnit = u => u === "heure" ? "h" : u === "jour" ? "j" : u === "forfait" ? "forfait" : "u";
+
+  let DATA = deepClone(DEFAULT);
+  const view = $("#view");
+  function defaultRef() { const d = new Date(), p = n => String(n).padStart(2, "0"); return "DV-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()); }
+  function makeState() { return { client: "", owner: "", title: "", projectType: "", ref: defaultRef(), products: {}, pds: [], gestion: [], fees: {}, price: null, pmode: "detail" }; }
+  let state = makeState();
+
+  let toastTimer = null;
+  function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("on"), 2700); }
+  function setChip(text, cls) { const c = $("#dataChip"); if (!c) return; c.textContent = text; c.classList.remove("warn"); if (cls === "warn") c.classList.add("warn"); }
+
+  /* ---------------- routeur ---------------- */
+  function route(name) { $$(".viewswitch button").forEach(b => b.setAttribute("aria-current", b.dataset.view === name ? "true" : "false")); if (name === "admin") mountAdmin(); else mountDevis(); }
+  $$(".viewswitch button").forEach(b => b.addEventListener("click", () => route(b.dataset.view)));
+
+  /* =====================================================================
+     VUE DEVIS
+     ===================================================================== */
+  const DEVIS_HTML = `
+    <nav class="stepnav">
+      <a href="#s-mission" data-step="s-mission"><span class="n">1</span> Mission</a>
+      <a href="#s-presta" data-step="s-presta"><span class="n">2</span> Prestations facturées</a>
+      <a href="#s-couts" data-step="s-couts"><span class="n">3</span> Vos coûts</a>
+    </nav>
+    <div class="worka">
+      <section class="card step" id="s-mission">
+        <div class="step-head"><div class="step-badge mission">1</div>
+          <div><h2>La mission</h2><div class="sub">Pour qui, et quelle dominante de projet</div></div></div>
+        <div class="step-body"><div class="grid-2">
+          <div class="field"><label for="fClient">Client</label><input id="fClient" type="text" placeholder="Ex. Laboratoire Pierre Fabre" autocomplete="off"></div>
+          <div class="field"><label for="fTitle">Titre de la mission</label><input id="fTitle" type="text" placeholder="Ex. Formation DPC — santé au travail" autocomplete="off"></div>
+          <div class="field"><label for="fOwner">Responsable projet (HYC)</label><input id="fOwner" type="text" placeholder="Ex. Pierre" autocomplete="off"></div>
+          <div class="field"><label for="fRef">Référence du devis</label><input id="fRef" type="text" autocomplete="off"></div>
+          <div class="field"><label for="fType">Type de projet (dominante)</label><select id="fType"></select><span class="help">Contexte de la mission (le devis conserve cette information).</span></div>
+        </div></div>
+      </section>
+
+      <section class="card step" id="s-presta">
+        <div class="step-head"><div class="step-badge rev">2</div>
+          <div><h2>Prestations proposées</h2><div class="sub">Ce que paie le client — coche les prestations du catalogue</div></div>
+          <div class="tot rev"><span class="lab">Chiffre d'affaires</span><span class="amt" id="revTot">0 €</span></div></div>
+        <div class="step-body">
+          <input id="prodSearch" class="search" type="search" placeholder="Rechercher une prestation…">
+          <div id="catalog" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <section class="card step" id="s-couts">
+        <div class="step-head"><div class="step-badge cost">3</div>
+          <div><h2>Charges de mission <span class="tag-int">n'apparaît pas sur le devis client</span></h2>
+            <div class="sub">Coûts directs de la mission — honoraires PdS, gestion, frais</div></div>
+          <div class="tot cost"><span class="lab">Charges directes</span><span class="amt" id="costTot">0 €</span></div></div>
+        <div class="step-body">
+          <div class="costblock">
+            <div class="costblock-head"><h3>Professionnels de santé</h3><span class="bsub">honoraires — forfait/jour ou au temps</span><span class="btot" id="pdsTot">0 €</span></div>
+            <div id="pdsList" class="dyn-list"></div>
+            <button id="addPds" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter un intervenant</button>
+          </div>
+          <div class="costblock">
+            <div class="costblock-head"><h3>Temps de gestion de projet</h3><span class="bsub">temps équipe HYC</span><span class="btot" id="gestionTot">0 €</span></div>
+            <div id="gestionList" class="dyn-list"></div>
+            <button id="addGestion" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter du temps de gestion</button>
+          </div>
+          <div class="costblock">
+            <div class="costblock-head"><h3>Frais annexes</h3><span class="bsub">déplacement, montage, sourcing…</span><span class="btot" id="feesTot">0 €</span></div>
+            <div id="feesList"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="summary">
+      <div class="rc">
+        <div class="rc-head"><span class="eyebrow">Devis client</span><h3>Montant à facturer</h3></div>
+        <div class="rc-body">
+          <div class="price-lab">Prix de vente HT</div>
+          <div class="price-input"><input id="priceFinal" type="text" inputmode="decimal" aria-label="Prix de vente HT"><span class="cur">€</span></div>
+          <div class="price-cap" id="priceCap"></div>
+          <button id="priceReset" class="price-reset" type="button" hidden>↩ Revenir au total des prestations</button>
+          <div class="ttc" id="ttcBlock"></div>
+        </div>
+      </div>
+
+      <div class="rc">
+        <div class="rc-head"><span class="eyebrow">Rentabilité · interne</span><h3>Marge de la mission</h3></div>
+        <div class="rc-body">
+          <div class="kpis">
+            <div class="kpi" id="kpiMarque"><span class="kl">Taux de marque</span><span class="kv">—</span><span class="ko">objectif &gt; <b id="objMarque">40</b> %</span></div>
+            <div class="kpi" id="kpiMarge"><span class="kl">Taux de marge</span><span class="kv">—</span><span class="ko">objectif &gt; <b id="objMarge">60</b> %</span></div>
+          </div>
+          <div class="floor" id="floorLine" hidden></div>
+          <hr class="rc-sep">
+          <div class="rc-rows">
+            <div class="rc-row rev"><span>Chiffre d'affaires</span><span class="v" id="rcRev">0 €</span></div>
+            <div class="rc-row cost"><span>− Professionnels de santé <em class="w" id="wPds"></em></span><span class="v" id="rcPds">0 €</span></div>
+            <div class="rc-row cost"><span>− Temps de gestion <em class="w" id="wGestion"></em></span><span class="v" id="rcGestion">0 €</span></div>
+            <div class="rc-row cost"><span>− Frais annexes <em class="w" id="wFrais"></em></span><span class="v" id="rcFrais">0 €</span></div>
+            <div class="rc-row cost sub"><span>= Charges directes <em class="w" id="wCosts"></em></span><span class="v" id="rcCosts">0 €</span></div>
+            <hr class="rc-sep">
+            <div class="rc-row gross"><span>= Marge brute</span><span class="v" id="rcGross">0 €</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rc"><div class="rc-body">
+        <div class="mode-opts"><span>Devis :</span>
+          <label><input type="radio" name="pmode" value="detail" checked> détaillé</label>
+          <label><input type="radio" name="pmode" value="forfait"> forfaitaire</label></div>
+        <div class="rc-actions">
+          <button id="btnExport" class="btn btn-primary" type="button">⬇ Exporter le devis client (PDF)</button>
+          <button id="btnReset" class="btn btn-ghost btn-sm" type="button">Réinitialiser le devis</button>
+        </div>
+      </div></div>
+    </aside>`;
+
+  function mountDevis() {
+    view.className = "layout";
+    view.innerHTML = DEVIS_HTML;
+    setChip("Aperçu — données en mémoire");
+    buildMission(); buildCatalog(); buildFees(); renderPds(); renderGestion();
+    $("#addPds").addEventListener("click", () => { state.pds.push({ id: uid("pds"), mode: "forfait", prestationId: DATA.pdsForfait[0] ? DATA.pdsForfait[0].id : "", group: "specialiste", profileId: DATA.pdsProfiles[0] ? DATA.pdsProfiles[0].id : "", unit: "jour", qty: 1 }); renderPds(); recompute(); });
+    $("#addGestion").addEventListener("click", () => { state.gestion.push({ id: uid("g"), memberId: DATA.team[0] ? DATA.team[0].id : "", unit: "jour", qty: 1 }); renderGestion(); recompute(); });
+    bindSummary(); setupStepnav(); recompute();
+  }
+
+  function buildMission() {
+    const sel = $("#fType");
+    sel.innerHTML = '<option value="">— Choisir —</option>' + DATA.projectTypes.map(t => `<option value="${esc(t.id)}">${esc(t.label)}</option>`).join("");
+    $("#fClient").value = state.client; $("#fTitle").value = state.title; $("#fOwner").value = state.owner; $("#fRef").value = state.ref; sel.value = state.projectType;
+    $("#fClient").addEventListener("input", e => { state.client = e.target.value; markSteps(); });
+    $("#fTitle").addEventListener("input", e => { state.title = e.target.value; });
+    $("#fOwner").addEventListener("input", e => { state.owner = e.target.value; });
+    $("#fRef").addEventListener("input", e => { state.ref = e.target.value; });
+    sel.addEventListener("change", e => { state.projectType = e.target.value; recompute(); });
+  }
+
+  /* --- catalogue (revenue) --- */
+  function buildCatalog() {
+    const host = $("#catalog");
+    const cats = DATA.categories.filter(c => DATA.products.some(p => p.category === c));
+    DATA.products.forEach(p => { if (!cats.includes(p.category)) cats.push(p.category); });
+    host.innerHTML = cats.map((cat, i) => {
+      const prods = DATA.products.filter(p => p.category === cat);
+      const rows = prods.map(p => {
+        const qty = state.products[p.id], on = qty != null;
+        return `<div class="prod-row ${on ? "is-on" : ""}" data-id="${esc(p.id)}" data-search="${esc((p.label + " " + p.description).toLowerCase())}">
+          <label class="prod-label"><input type="checkbox" ${on ? "checked" : ""}>
+            <span class="txt"><span class="name">${esc(p.label)}</span><span class="desc" title="${esc(p.description)}">${esc(p.description)}</span></span></label>
+          <span class="prod-pu">${p.price > 0 ? fmtEUR(p.price) + ' <span class="unit">/ ' + esc(shortUnit(p.unit)) + "</span>" : '<span class="warn-zero">prix à définir</span>'}</span>
+          <span class="prod-qty"><input type="number" min="0" step="0.5" value="${on ? qty : ""}" placeholder="${esc(shortUnit(p.unit))}" ${on ? "" : "disabled"} aria-label="Quantité"></span>
+          <span class="prod-total ${on ? "" : "zero"}">${on ? fmtEUR(p.price * qty) : "—"}</span></div>`;
+      }).join("");
+      return `<details class="cat" ${i === 0 ? "open" : ""}><summary><span class="caret">▶</span> ${esc(cat)} <span class="picked" hidden></span><span class="count">${prods.length}</span></summary>${rows}</details>`;
+    }).join("");
+    host.addEventListener("change", e => {
+      const row = e.target.closest(".prod-row"); if (!row) return;
+      const id = row.dataset.id, p = DATA.products.find(x => x.id === id), qi = row.querySelector('input[type="number"]');
+      if (e.target.type === "checkbox") { if (e.target.checked) { const q = parseNum(qi.value) || 1; state.products[id] = q; qi.disabled = false; qi.value = q; } else { delete state.products[id]; qi.disabled = true; } }
+      updateProdRow(row, p); recompute();
+    });
+    host.addEventListener("input", e => {
+      if (e.target.type !== "number") return;
+      const row = e.target.closest(".prod-row"), id = row.dataset.id;
+      if (state.products[id] == null) return; state.products[id] = Math.max(0, parseNum(e.target.value));
+      updateProdRow(row, DATA.products.find(x => x.id === id)); recompute();
+    });
+    $("#prodSearch").addEventListener("input", e => {
+      const q = e.target.value.trim().toLowerCase();
+      $$(".prod-row", host).forEach(r => { r.style.display = !q || r.dataset.search.includes(q) ? "" : "none"; });
+      $$("details.cat", host).forEach(d => { const any = $$(".prod-row", d).some(r => r.style.display !== "none"); d.style.display = any ? "" : "none"; if (q && any) d.open = true; });
+    });
+    refreshCatBadges();
+  }
+  function updateProdRow(row, p) {
+    const qty = state.products[p.id], on = qty != null;
+    row.classList.toggle("is-on", on);
+    const t = row.querySelector(".prod-total"); t.textContent = on ? fmtEUR(p.price * qty) : "—"; t.classList.toggle("zero", !on);
+    refreshCatBadges();
+  }
+  function refreshCatBadges() {
+    $$("details.cat").forEach(d => { const n = $$(".prod-row", d).filter(r => state.products[r.dataset.id] != null).length; const b = d.querySelector(".picked"); b.hidden = n === 0; b.textContent = n + " \u2713"; });
+  }
+
+  /* --- PdS (cost) --- */
+  function pdsUnitPrice(l) {
+    if (l.mode === "forfait") { const pr = DATA.pdsForfait.find(x => x.id === l.prestationId); return pr ? parseNum(pr.rates[l.group]) : 0; }
+    const prof = DATA.pdsProfiles.find(x => x.id === l.profileId); if (!prof) return 0;
+    return l.unit === "heure" ? parseNum(prof.rateHour) : parseNum(prof.rateDay);
+  }
+  function pdsLabel(l) {
+    if (l.mode === "forfait") { const pr = DATA.pdsForfait.find(x => x.id === l.prestationId), g = DATA.pdsGroups.find(x => x.id === l.group); return (pr ? pr.label : "Prestation PdS") + " — " + (g ? g.label : ""); }
+    const prof = DATA.pdsProfiles.find(x => x.id === l.profileId); return "Intervention " + (prof ? prof.label : "PdS") + " (au temps)";
+  }
+  function renderPds() {
+    const host = $("#pdsList");
+    if (!state.pds.length) { host.innerHTML = '<p class="empty">Aucun intervenant. Ajoute un professionnel de santé si la mission en mobilise.</p>'; return; }
+    host.innerHTML = state.pds.map(l => {
+      const pu = pdsUnitPrice(l);
+      const modeSel = `<div class="field"><label>Mode</label><select data-f="mode"><option value="forfait" ${l.mode === "forfait" ? "selected" : ""}>Forfait/jour</option><option value="temps" ${l.mode === "temps" ? "selected" : ""}>Au temps</option></select></div>`;
+      let mid;
+      if (l.mode === "forfait") {
+        mid = `<div class="field"><label>Prestation</label><select data-f="prestationId">${DATA.pdsForfait.map(p => `<option value="${esc(p.id)}" ${p.id === l.prestationId ? "selected" : ""}>${esc(p.label)}</option>`).join("")}</select></div>
+          <div class="field"><label>Profil</label><select data-f="group">${DATA.pdsGroups.map(g => `<option value="${esc(g.id)}" ${g.id === l.group ? "selected" : ""}>${esc(g.label)}</option>`).join("")}</select></div>
+          <div class="field"><label>Jours</label><input data-f="qty" type="number" min="0" step="0.5" value="${l.qty}"></div>`;
+      } else {
+        mid = `<div class="field"><label>Profil</label><select data-f="profileId">${DATA.pdsProfiles.map(p => `<option value="${esc(p.id)}" ${p.id === l.profileId ? "selected" : ""}>${esc(p.label)}</option>`).join("")}</select></div>
+          <div class="field"><label>Unité</label><select data-f="unit"><option value="jour" ${l.unit === "jour" ? "selected" : ""}>Jour</option><option value="heure" ${l.unit === "heure" ? "selected" : ""}>Heure</option></select></div>
+          <div class="field"><label>Quantité</label><input data-f="qty" type="number" min="0" step="0.5" value="${l.qty}"></div>`;
+      }
+      const warn = pu <= 0 ? ' <span class="warn-zero">tarif 0 — voir « Tarifs »</span>' : "";
+      return `<div class="dyn-row row-pds" data-id="${esc(l.id)}">${modeSel}${mid}<div class="line-total">${fmtEUR(pu)}/u<br><b>${fmtEUR(pu * l.qty)}</b>${warn}</div><button class="rm" type="button" aria-label="Supprimer">✕</button></div>`;
+    }).join("");
+    host.querySelectorAll(".dyn-row").forEach(row => {
+      const line = state.pds.find(x => x.id === row.dataset.id);
+      row.addEventListener("change", e => { const f = e.target.dataset.f; if (!f) return; line[f] = f === "qty" ? Math.max(0, parseNum(e.target.value)) : e.target.value; if (f === "mode") renderPds(); else refreshPdsRow(row, line); recompute(); });
+      row.addEventListener("input", e => { if (e.target.dataset.f !== "qty") return; line.qty = Math.max(0, parseNum(e.target.value)); refreshPdsRow(row, line); recompute(); });
+      row.querySelector(".rm").addEventListener("click", () => { state.pds = state.pds.filter(x => x.id !== line.id); renderPds(); recompute(); });
+    });
+  }
+  function refreshPdsRow(row, line) { const pu = pdsUnitPrice(line); const warn = pu <= 0 ? ' <span class="warn-zero">tarif 0 — voir « Tarifs »</span>' : ""; row.querySelector(".line-total").innerHTML = fmtEUR(pu) + "/u<br><b>" + fmtEUR(pu * line.qty) + "</b>" + warn; }
+
+  /* --- gestion (cost) --- */
+  function gestionUnitPrice(l) { const m = DATA.team.find(x => x.id === l.memberId); if (!m) return 0; return l.unit === "heure" ? parseNum(m.rateHour) : parseNum(m.rateDay); }
+  function renderGestion() {
+    const host = $("#gestionList");
+    if (!state.gestion.length) { host.innerHTML = '<p class="empty">Ajoute le temps de gestion de l\u2019équipe (jours ou heures).</p>'; return; }
+    host.innerHTML = state.gestion.map(l => {
+      const pu = gestionUnitPrice(l);
+      return `<div class="dyn-row row-gestion" data-id="${esc(l.id)}">
+        <div class="field"><label>Gestionnaire</label><select data-f="memberId">${DATA.team.map(m => `<option value="${esc(m.id)}" ${m.id === l.memberId ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
+        <div class="field"><label>Unité</label><select data-f="unit"><option value="jour" ${l.unit === "jour" ? "selected" : ""}>Jour</option><option value="heure" ${l.unit === "heure" ? "selected" : ""}>Heure</option></select></div>
+        <div class="field"><label>Quantité</label><input data-f="qty" type="number" min="0" step="0.5" value="${l.qty}"></div>
+        <div class="line-total">${fmtEUR(pu)}/u<br><b>${fmtEUR(pu * l.qty)}</b></div>
+        <button class="rm" type="button" aria-label="Supprimer">✕</button></div>`;
+    }).join("");
+    host.querySelectorAll(".dyn-row").forEach(row => {
+      const line = state.gestion.find(x => x.id === row.dataset.id);
+      const refresh = () => { const pu = gestionUnitPrice(line); row.querySelector(".line-total").innerHTML = fmtEUR(pu) + "/u<br><b>" + fmtEUR(pu * line.qty) + "</b>"; };
+      row.addEventListener("change", e => { const f = e.target.dataset.f; if (!f) return; line[f] = f === "qty" ? Math.max(0, parseNum(e.target.value)) : e.target.value; refresh(); recompute(); });
+      row.addEventListener("input", e => { if (e.target.dataset.f !== "qty") return; line.qty = Math.max(0, parseNum(e.target.value)); refresh(); recompute(); });
+      row.querySelector(".rm").addEventListener("click", () => { state.gestion = state.gestion.filter(x => x.id !== line.id); renderGestion(); recompute(); });
+    });
+  }
+
+  /* --- frais (cost) --- */
+  function buildFees() {
+    const host = $("#feesList");
+    host.innerHTML = DATA.fees.map(f => {
+      const qty = state.fees[f.id], on = qty != null;
+      return `<div class="fee-row" data-id="${esc(f.id)}">
+        <label class="prod-label"><input type="checkbox" ${on ? "checked" : ""}><span class="txt"><span class="name">${esc(f.label)}</span><span class="desc">${esc(f.description || "")}</span></span></label>
+        <span class="prod-pu">${fmtEUR(f.cost)} <span class="unit">/ ${esc(shortUnit(f.unit))}</span></span>
+        <span class="prod-qty"><input type="number" min="0" step="0.5" value="${on ? qty : ""}" ${on ? "" : "disabled"} aria-label="Quantité"></span>
+        <span class="prod-total ${on ? "" : "zero"}">${on ? fmtEUR(f.cost * qty) : "—"}</span></div>`;
+    }).join("");
+    host.addEventListener("change", e => {
+      const row = e.target.closest(".fee-row"); if (!row) return;
+      const f = DATA.fees.find(x => x.id === row.dataset.id), qi = row.querySelector('input[type="number"]');
+      if (e.target.type === "checkbox") { if (e.target.checked) { const q = parseNum(qi.value) || 1; state.fees[f.id] = q; qi.disabled = false; qi.value = q; } else { delete state.fees[f.id]; qi.disabled = true; } }
+      refreshFeeRow(row, f); recompute();
+    });
+    host.addEventListener("input", e => {
+      if (e.target.type !== "number") return;
+      const row = e.target.closest(".fee-row"), f = DATA.fees.find(x => x.id === row.dataset.id);
+      if (state.fees[f.id] == null) return; state.fees[f.id] = Math.max(0, parseNum(e.target.value)); refreshFeeRow(row, f); recompute();
+    });
+  }
+  function refreshFeeRow(row, f) { const qty = state.fees[f.id], on = qty != null; const t = row.querySelector(".prod-total"); t.textContent = on ? fmtEUR(f.cost * qty) : "—"; t.classList.toggle("zero", !on); }
+
+  /* --- calculs (modèle A) --- */
+  function computeItems() {
+    const items = [];
+    Object.keys(state.products).forEach(id => { const p = DATA.products.find(x => x.id === id); if (!p) return; const q = state.products[id]; if (q <= 0) return; items.push({ section: "prod", label: p.label, description: p.description, qty: q, unit: p.unit, pu: p.price }); });
+    state.pds.forEach(l => { if (l.qty <= 0) return; items.push({ section: "pds", label: pdsLabel(l), description: "", qty: l.qty, unit: l.mode === "temps" ? l.unit : "jour", pu: pdsUnitPrice(l) }); });
+    state.gestion.forEach(l => { if (l.qty <= 0) return; const m = DATA.team.find(x => x.id === l.memberId); items.push({ section: "gestion", label: "Gestion de projet — " + (m ? m.label : ""), description: "", qty: l.qty, unit: l.unit, pu: gestionUnitPrice(l) }); });
+    Object.keys(state.fees).forEach(id => { const f = DATA.fees.find(x => x.id === id); if (!f) return; const q = state.fees[id]; if (q <= 0) return; items.push({ section: "frais", label: f.label, description: f.description || "", qty: q, unit: f.unit, pu: f.cost }); });
+    return items;
+  }
+  function totals(items) {
+    let revenue = 0, pds = 0, gestion = 0, frais = 0;
+    items.forEach(it => { const a = it.pu * it.qty; if (it.section === "prod") revenue += a; else if (it.section === "pds") pds += a; else if (it.section === "gestion") gestion += a; else frais += a; });
+    const costs = round2(pds + gestion + frais);
+    return { revenue: round2(revenue), pds: round2(pds), gestion: round2(gestion), frais: round2(frais), costs };
+  }
+  function currentType() { return DATA.projectTypes.find(t => t.id === state.projectType) || null; }
+
+  /* --- synthèse --- */
+  function bindSummary() {
+    const input = $("#priceFinal");
+    input.addEventListener("input", () => { state.price = input.value.trim() === "" ? null : parseNum(input.value); recompute(false); });
+    $("#priceReset").addEventListener("click", () => { state.price = null; recompute(); });
+    $$('input[name="pmode"]').forEach(r => r.addEventListener("change", e => { state.pmode = e.target.value; }));
+    $("#btnExport").addEventListener("click", exportPDF);
+    $("#btnReset").addEventListener("click", () => { if (!confirm("Réinitialiser tout le devis en cours ?")) return; state = makeState(); mountDevis(); });
+    $$('input[name="pmode"]').forEach(r => { r.checked = r.value === state.pmode; });
+  }
+
+  function recompute(updateField) {
+    const items = computeItems(), t = totals(items), type = currentType();
+    const CA = t.revenue, costs = t.costs;
+    const price = state.price != null ? state.price : CA;
+
+    $("#revTot").textContent = fmtEUR(CA);
+    $("#pdsTot").textContent = fmtEUR(t.pds);
+    $("#gestionTot").textContent = fmtEUR(t.gestion);
+    $("#feesTot").textContent = fmtEUR(t.frais);
+    $("#costTot").textContent = fmtEUR(costs);
+
+    const input = $("#priceFinal");
+    if (updateField !== false) input.value = state.price != null ? String(state.price).replace(".", ",") : (CA ? String(CA).replace(".", ",") : "");
+    $("#priceReset").hidden = state.price == null || round2(state.price) === CA;
+    const remise = round2(CA - price);
+    $("#priceCap").innerHTML = "Total des prestations : <b>" + fmtEUR(CA) + "</b>" + (Math.abs(remise) >= 0.01 ? (remise > 0 ? " · remise " + fmtEUR(remise) : " · majoration " + fmtEUR(-remise)) : "");
+
+    const tva = parseNum(DATA.settings.tvaRate);
+    $("#ttcBlock").innerHTML = price > 0
+      ? `<div class="tc-row"><span>Total HT</span><span class="v">${fmtEUR(price)}</span></div><div class="tc-row"><span>TVA ${fmtPct(tva)}</span><span class="v">${fmtEUR(price * tva / 100)}</span></div><div class="tc-row big"><span>Total TTC</span><span class="v">${fmtEUR(price * (1 + tva / 100))}</span></div>`
+      : '<div class="tc-row"><span>Ajoute une prestation facturée</span><span class="v">—</span></div>';
+
+    $("#rcRev").textContent = fmtEUR(CA);
+    $("#rcPds").textContent = fmtEUR(t.pds);
+    $("#rcGestion").textContent = fmtEUR(t.gestion);
+    $("#rcFrais").textContent = fmtEUR(t.frais);
+    $("#rcCosts").textContent = fmtEUR(costs);
+    $("#rcGross").textContent = fmtEUR(price - costs);
+    const wt = (id, v) => { const el = $(id); el.textContent = price > 0 && v > 0 ? fmtPct(v / price * 100) + " du CA" : ""; };
+    wt("#wPds", t.pds); wt("#wGestion", t.gestion); wt("#wFrais", t.frais); wt("#wCosts", costs);
+
+    renderKpis(price, costs);
+
+    const objMarque = parseNum(DATA.settings.objectifTauxMarque), objMarge = parseNum(DATA.settings.objectifTauxMarge);
+    $("#objMarque").textContent = objMarque; $("#objMarge").textContent = objMarge;
+    const floor = $("#floorLine");
+    if (costs > 0 && objMarque < 100) {
+      const plMarque = costs / (1 - objMarque / 100);
+      const plMarge = costs * (1 + objMarge / 100);
+      const plancher = Math.max(plMarque, plMarge);
+      floor.hidden = false;
+      floor.innerHTML = `Pour tenir vos objectifs (marque &gt; ${fmtPct(objMarque)}, marge &gt; ${fmtPct(objMarge)}), facturez au moins <b>${fmtEUR(plancher)}</b>.`;
+    } else floor.hidden = true;
+
+    markSteps();
+  }
+
+  function kpiStatus(val, target) {
+    if (val >= target) return "v-green";
+    if (val >= target - 15 && val >= 0) return "v-amber";
+    if (val >= 0) return "v-orange";
+    return "v-red";
+  }
+  function renderKpis(price, costs) {
+    const marque = $("#kpiMarque"), marge = $("#kpiMarge");
+    const setKpi = (el, val, target, naText) => {
+      const vEl = el.querySelector(".kv");
+      if (val == null) { el.className = "kpi v-none"; vEl.textContent = naText || "—"; return; }
+      el.className = "kpi " + kpiStatus(val, target);
+      vEl.textContent = fmtPct(val);
+    };
+    const gross = price - costs;
+    const objMarque = parseNum(DATA.settings.objectifTauxMarque), objMarge = parseNum(DATA.settings.objectifTauxMarge);
+    // taux de marque = marge brute / CA
+    setKpi(marque, price > 0 ? gross / price * 100 : null, objMarque);
+    // taux de marge = marge brute / charges directes (n/a si pas de charges)
+    if (price <= 0) { marge.className = "kpi v-none"; marge.querySelector(".kv").textContent = "—"; }
+    else if (costs <= 0) { marge.className = "kpi v-green"; marge.querySelector(".kv").textContent = "∞"; }
+    else setKpi(marge, gross / costs * 100, objMarge);
+  }
+
+  /* --- fil d'étapes --- */
+  function markSteps() {
+    const set = (sel, done) => { const a = $(`.stepnav a[data-step="${sel}"]`); if (a) a.classList.toggle("done", !!done); };
+    set("s-mission", state.client && state.projectType);
+    set("s-presta", Object.keys(state.products).length > 0);
+    set("s-couts", state.pds.length || state.gestion.length || Object.keys(state.fees).length);
+  }
+  function setupStepnav() {
+    $$(".stepnav a").forEach(a => a.addEventListener("click", e => {
+      e.preventDefault(); const el = $("#" + a.dataset.step);
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 78, behavior: "smooth" });
+    }));
+    if ("IntersectionObserver" in window) {
+      const obs = new IntersectionObserver(ents => {
+        ents.forEach(en => { if (en.isIntersecting) { $$(".stepnav a").forEach(a => a.classList.toggle("active", a.dataset.step === en.target.id)); } });
+      }, { rootMargin: "-80px 0px -60% 0px", threshold: 0 });
+      ["s-mission", "s-presta", "s-couts"].forEach(id => { const el = $("#" + id); if (el) obs.observe(el); });
+    }
+  }
+
+  /* --- export PDF (devis client : produits uniquement) --- */
+  function exportPDF() {
+    const items = computeItems(), t = totals(items);
+    const products = items.filter(it => it.section === "prod");
+    if (!products.length || t.revenue <= 0) { toast("Ajoute au moins une prestation facturée avant d'exporter."); return; }
+    const price = state.price != null ? state.price : t.revenue;
+    buildPrintDoc(products, t.revenue, price);
+    sendQuoteToSheet(products, t, price);
+    const prev = document.title; document.title = (state.ref || "Devis") + " — " + (state.client || "HYC"); window.print(); document.title = prev;
+  }
+
+  /* --- envoi Google Sheets (Web App Apps Script, réglage « URL Google Sheets ») --- */
+  function sendQuoteToSheet(products, t, price) {
+    const url = String(DATA.settings.sheetWebhookUrl || "").trim();
+    if (!/^https:\/\/script\.google\.com\//.test(url)) return;
+    const tva = parseNum(DATA.settings.tvaRate), type = currentType();
+    const gross = round2(price - t.costs);
+    const payload = {
+      date: new Date().toISOString(),
+      ref: state.ref || "",
+      client: state.client || "",
+      titre: state.title || "",
+      responsable: state.owner || "",
+      typeProjet: type ? type.label : "",
+      modeDevis: state.pmode === "forfait" ? "forfaitaire" : "détaillé",
+      prestations: products.map(p => p.label + " × " + String(p.qty).replace(".", ",") + " " + shortUnit(p.unit)).join(" | "),
+      caCatalogueHT: t.revenue,
+      prixVenteHT: round2(price),
+      remiseHT: round2(t.revenue - price),
+      tvaPct: tva,
+      totalTTC: round2(price * (1 + tva / 100)),
+      chargesPds: t.pds,
+      chargesGestion: t.gestion,
+      fraisAnnexes: t.frais,
+      totalCharges: t.costs,
+      margeBrute: gross,
+      tauxMarquePct: price > 0 ? round2(gross / price * 100) : "",
+      tauxMargePct: t.costs > 0 ? round2(gross / t.costs * 100) : ""
+    };
+    try {
+      // no-cors + text/plain : requête « simple », acceptée par Apps Script sans prévol CORS.
+      fetch(url, { method: "POST", mode: "no-cors", keepalive: true, headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
+        .then(() => toast("Devis envoyé au Google Sheet."))
+        .catch(() => toast("Devis exporté, mais l'envoi au Google Sheet a échoué."));
+    } catch (err) { toast("Devis exporté, mais l'envoi au Google Sheet a échoué."); }
+  }
+  function buildPrintDoc(products, CA, price) {
+    const S = DATA.settings, tva = parseNum(S.tvaRate);
+    let rows = "", clientLines = [];
+    if (state.pmode === "forfait") {
+      const incl = products.map(p => p.label).join(", ");
+      clientLines = [{ label: state.title || "Prestation Hack Your Care", description: incl ? "Comprend : " + incl + "." : "", qty: 1, unit: "forfait", total: round2(price) }];
+    } else {
+      clientLines = products.map(p => ({ label: p.label, description: p.description, qty: p.qty, unit: p.unit, total: round2(p.pu * p.qty) }));
+      const remise = round2(price - CA);
+      if (remise <= -0.01) clientLines.push({ label: "Remise commerciale", description: "", qty: 1, unit: "forfait", total: remise });
+      else if (remise >= 0.01) clientLines.push({ label: "Prestations complémentaires", description: "", qty: 1, unit: "forfait", total: remise });
+    }
+    function lineRow(l) { const pu = l.qty > 0 ? l.total / l.qty : l.total; return `<tr><td><div class="des">${esc(l.label)}</div>${l.description ? `<div class="dsc">${esc(l.description)}</div>` : ""}</td><td class="num">${String(l.qty).replace(".", ",")} ${esc(shortUnit(l.unit))}</td><td class="num">${fmtEUR2(pu)}</td><td class="num">${fmtEUR2(l.total)}</td></tr>`; }
+    clientLines.forEach(l => { rows += lineRow(l); });
+    const totalHT = round2(clientLines.reduce((a, l) => a + l.total, 0)), tvaAmt = round2(totalHT * tva / 100), ttc = round2(totalHT + tvaAmt);
+    const footer = String(S.quoteFooter || "").replace("{validite}", S.validityDays);
+    $("#printRoot").innerHTML = `
+      <div class="pq-head"><div class="pq-brand">HACK YOUR CARE<small>${esc(S.emitterBlock || S.company || "")}</small></div>
+        <div class="pq-meta"><div class="doc">DEVIS</div><div class="ref">${esc(state.ref || "")}</div><div>Date : ${todayFR()}</div>${state.owner ? `<div>Suivi par : ${esc(state.owner)}</div>` : ""}</div></div>
+      <div class="pq-parties"><div class="pq-client"><div class="lbl">À l'attention de</div><div class="name">${esc(state.client || "—")}</div></div></div>
+      <p class="pq-object"><b>Objet :</b> ${esc(state.title || "Prestation Hack Your Care")}</p>
+      <table class="pq"><thead><tr><th>Désignation</th><th class="num">Qté</th><th class="num">PU HT</th><th class="num">Total HT</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="pq-totals"><table><tr><td>Total HT</td><td class="num">${fmtEUR2(totalHT)}</td></tr><tr><td>TVA ${fmtPct(tva)}</td><td class="num">${fmtEUR2(tvaAmt)}</td></tr><tr class="tt"><td>Total TTC</td><td class="num">${fmtEUR2(ttc)}</td></tr></table></div>
+      <div class="pq-foot">${esc(footer)}</div>
+      <div class="pq-sign"><div class="box">Pour ${esc(S.company || "Hack Your Care")}<br>Date et signature</div><div class="box">Bon pour accord — ${esc(state.client || "Client")}<br>Date et signature</div></div>`;
+  }
+
+  /* =====================================================================
+     VUE ADMIN
+     ===================================================================== */
+  let adirty = false;
+  const ADMIN_HTML = `
+    <p class="note"><b>Aperçu :</b> tes modifications s'appliquent <b>immédiatement au devis</b> (tout est en mémoire).
+      Pour publier de nouveaux tarifs à toute l'équipe, clique <b>Exporter data.js</b> et remplace le fichier dans le dépôt GitHub. Cet aperçu ne conserve rien après fermeture de l'onglet.</p>
+    <nav class="tabs" id="tabs">
+      <button class="tab" data-tab="marges" aria-selected="true">Marges</button>
+      <button class="tab" data-tab="catalogue" aria-selected="false">Catalogue (prix de vente)</button>
+      <button class="tab" data-tab="forfait" aria-selected="false">PdS · forfait</button>
+      <button class="tab" data-tab="temps" aria-selected="false">PdS · au temps</button>
+      <button class="tab" data-tab="equipe" aria-selected="false">Équipe</button>
+      <button class="tab" data-tab="frais" aria-selected="false">Frais</button>
+      <button class="tab" data-tab="reglages" aria-selected="false">Réglages</button>
+    </nav>
+    <section id="panel-marges" class="panel on"></section>
+    <section id="panel-catalogue" class="panel"></section>
+    <section id="panel-forfait" class="panel"></section>
+    <section id="panel-temps" class="panel"></section>
+    <section id="panel-equipe" class="panel"></section>
+    <section id="panel-frais" class="panel"></section>
+    <section id="panel-reglages" class="panel"></section>
+    <div class="savebar"><div class="savebar-in">
+      <button id="btnSave" class="btn btn-primary" type="button">✓ Appliquer</button>
+      <button id="btnExport2" class="btn" type="button">⬇ Exporter data.js</button>
+      <button id="btnImport" class="btn" type="button">⬆ Importer</button>
+      <input id="fileImport" type="file" accept=".js,.json,.txt" hidden>
+      <button id="btnResetData" class="btn btn-ghost" type="button">♻ Tarifs par défaut</button>
+      <span id="status" class="status">Modifications appliquées en direct</span>
+    </div></div>`;
+
+  function mountAdmin() {
+    view.className = "";
+    view.innerHTML = ADMIN_HTML;
+    setChip("Aperçu — données en mémoire");
+    $("#tabs").addEventListener("click", e => { const b = e.target.closest(".tab"); if (!b) return; $$(".tab").forEach(t => t.setAttribute("aria-selected", t === b ? "true" : "false")); $$(".panel").forEach(p => p.classList.toggle("on", p.id === "panel-" + b.dataset.tab)); });
+    renderAll(); bindSavebar();
+  }
+  function markDirty() { adirty = true; const s = $("#status"); if (s) { s.textContent = "Modifications appliquées"; s.classList.add("saved"); } }
+  function renderAll() { renderMarges(); renderCatalogue(); renderForfait(); renderTemps(); renderEquipe(); renderFrais(); renderReglages(); }
+  function acard(title, hint, inner) { return `<div class="acard"><div class="acard-head"><h2>${title}</h2>${hint ? `<span class="hint">${hint}</span>` : ""}</div><div class="acard-body table-scroll">${inner}</div></div>`; }
+  function numIn(v, path, step) { return `<input class="num" type="number" step="${step || 1}" min="0" value="${v == null ? "" : v}" data-path="${path}">`; }
+  function txtIn(v, path, w) { return `<input type="text" value="${esc(v == null ? "" : v)}" data-path="${path}"${w ? ` style="min-width:${w}px"` : ""}>`; }
+  function bindPanel(p) {
+    p.addEventListener("input", e => { const path = e.target.dataset.path; if (!path) return; setPath(path, e.target.type === "number" ? parseNum(e.target.value) : e.target.value); markDirty(); });
+    p.addEventListener("change", e => { const path = e.target.dataset.path; if (!path || e.target.tagName !== "SELECT") return; setPath(path, e.target.value); markDirty(); });
+  }
+  function setPath(path, value) { const k = path.split("."); let o = DATA; for (let i = 0; i < k.length - 1; i++) o = o[/^\d+$/.test(k[i]) ? Number(k[i]) : k[i]]; const last = k[k.length - 1]; o[/^\d+$/.test(last) ? Number(last) : last] = value; }
+  function bindRowActions(p, rerender) { p.addEventListener("click", e => { const b = e.target.closest("[data-del]"); if (!b) return; const arr = DATA[b.dataset.del], it = arr[Number(b.dataset.i)]; if (!confirm(`Supprimer « ${it.label} » ?`)) return; arr.splice(Number(b.dataset.i), 1); markDirty(); rerender(); }); }
+
+  function renderMarges() {
+    const rows = DATA.projectTypes.map((t, i) => `<tr><td>${txtIn(t.label, `projectTypes.${i}.label`, 220)}</td><td>${numIn(t.margeVisee, `projectTypes.${i}.margeVisee`)}</td><td>${numIn(t.margeAcceptable, `projectTypes.${i}.margeAcceptable`)}</td><td>${numIn(t.margeDegradee, `projectTypes.${i}.margeDegradee`)}</td></tr>`).join("");
+    const p = $("#panel-marges"); p.innerHTML = acard("Marges par type de projet", "En % du prix de vente HT", `<table class="grid"><thead><tr><th>Type de projet</th><th>Marge visée %</th><th>Acceptable %</th><th>Dégradée %</th></tr></thead><tbody>${rows}</tbody></table>`); bindPanel(p);
+  }
+  function renderCatalogue() {
+    const catOpts = c => DATA.categories.map(x => `<option ${x === c ? "selected" : ""}>${esc(x)}</option>`).join("");
+    const unitOpts = u => ["unité", "heure", "jour", "forfait"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
+    const rows = DATA.products.map((pd, i) => `<tr><td><select data-path="products.${i}.category">${catOpts(pd.category)}</select></td><td>${txtIn(pd.label, `products.${i}.label`, 260)}</td><td><select data-path="products.${i}.unit">${unitOpts(pd.unit)}</select></td><td>${numIn(pd.price, `products.${i}.price`, 10)}</td><td>${txtIn(pd.description, `products.${i}.description`, 320)}</td><td><button class="rm" data-del="products" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-catalogue"); p.innerHTML = acard("Catalogue — prix de vente", "Prix facturé au client (HT). Les coûts PdS sont dans les onglets dédiés.", `<table class="grid"><thead><tr><th>Catégorie</th><th>Prestation</th><th>Unité</th><th>Prix de vente € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="product" style="margin-top:12px">＋ Ajouter une prestation</button>`);
+    bindPanel(p); bindRowActions(p, renderCatalogue);
+    p.querySelector('[data-add="product"]').addEventListener("click", () => { DATA.products.push({ id: uid("p"), category: DATA.categories[0], label: "Nouvelle prestation", unit: "unité", price: 0, description: "" }); markDirty(); renderCatalogue(); });
+  }
+  function renderForfait() {
+    const typeOpts = t => ["Formation", "Communication", "Marketing", "Expertise"].map(x => `<option ${x === t ? "selected" : ""}>${x}</option>`).join("");
+    const rows = DATA.pdsForfait.map((f, i) => `<tr><td><select data-path="pdsForfait.${i}.projectType">${typeOpts(f.projectType)}</select></td><td>${txtIn(f.label, `pdsForfait.${i}.label`, 220)}</td><td>${numIn(f.rates.generaliste, `pdsForfait.${i}.rates.generaliste`, 50)}</td><td>${numIn(f.rates.specialiste, `pdsForfait.${i}.rates.specialiste`, 50)}</td><td>${numIn(f.rates.paramedical, `pdsForfait.${i}.rates.paramedical`, 50)}</td><td><button class="rm" data-del="pdsForfait" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-forfait"); p.innerHTML = acard("Rémunération PdS — forfait/jour", "Coût interne · un tarif à 0 déclenche une alerte côté devis", `<table class="grid"><thead><tr><th>Type</th><th>Prestation</th><th>Généraliste €</th><th>Spécialiste €</th><th>Paramédical €</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="forfait" style="margin-top:12px">＋ Ajouter</button>`);
+    bindPanel(p); bindRowActions(p, renderForfait);
+    p.querySelector('[data-add="forfait"]').addEventListener("click", () => { DATA.pdsForfait.push({ id: uid("pf"), projectType: "Formation", label: "Nouvelle prestation", rates: { generaliste: 0, specialiste: 0, paramedical: 0 } }); markDirty(); renderForfait(); });
+  }
+  function renderTemps() {
+    const grpOpts = g => DATA.pdsGroups.map(x => `<option value="${x.id}" ${x.id === g ? "selected" : ""}>${esc(x.label)}</option>`).join("");
+    const rows = DATA.pdsProfiles.map((pr, i) => `<tr><td>${txtIn(pr.label, `pdsProfiles.${i}.label`, 220)}</td><td><select data-path="pdsProfiles.${i}.group">${grpOpts(pr.group)}</select></td><td>${numIn(pr.rateHour, `pdsProfiles.${i}.rateHour`, 10)}</td><td>${numIn(pr.rateDay, `pdsProfiles.${i}.rateDay`, 50)}</td><td><button class="rm" data-del="pdsProfiles" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-temps"); p.innerHTML = acard("Rémunération PdS — au temps", "Vides dans le fichier source : à compléter", `<table class="grid"><thead><tr><th>Typologie PdS</th><th>Profil tarifaire</th><th>€ / heure</th><th>€ / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="profile" style="margin-top:12px">＋ Ajouter</button>`);
+    bindPanel(p); bindRowActions(p, renderTemps);
+    p.querySelector('[data-add="profile"]').addEventListener("click", () => { DATA.pdsProfiles.push({ id: uid("pp"), label: "Nouveau profil", group: "paramedical", rateHour: 0, rateDay: 0 }); markDirty(); renderTemps(); });
+  }
+  function renderEquipe() {
+    const rows = DATA.team.map((m, i) => `<tr><td>${txtIn(m.label, `team.${i}.label`, 180)}</td><td>${numIn(m.rateHour, `team.${i}.rateHour`, 5)}</td><td>${numIn(m.rateDay, `team.${i}.rateDay`, 25)}</td><td><button class="rm" data-del="team" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-equipe"); p.innerHTML = acard("Équipe projet — coûts", "Coût jour = coût horaire × 7 dans le modèle source", `<table class="grid"><thead><tr><th>Gestionnaire</th><th>Coût € / heure</th><th>Coût € / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="member" style="margin-top:12px">＋ Ajouter</button>`);
+    bindPanel(p); bindRowActions(p, renderEquipe);
+    p.querySelector('[data-add="member"]').addEventListener("click", () => { DATA.team.push({ id: uid("tm"), label: "Nouveau membre", rateHour: 0, rateDay: 0 }); markDirty(); renderEquipe(); });
+  }
+  function renderFrais() {
+    const unitOpts = u => ["forfait", "jour", "heure", "unité"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
+    const rows = DATA.fees.map((f, i) => `<tr><td>${txtIn(f.label, `fees.${i}.label`, 260)}</td><td><select data-path="fees.${i}.unit">${unitOpts(f.unit)}</select></td><td>${numIn(f.cost, `fees.${i}.cost`, 25)}</td><td>${txtIn(f.description, `fees.${i}.description`, 300)}</td><td><button class="rm" data-del="fees" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-frais"); p.innerHTML = acard("Frais annexes — coûts", "Déplacements, montage vidéo, sourcing…", `<table class="grid"><thead><tr><th>Frais</th><th>Unité</th><th>Coût € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="fee" style="margin-top:12px">＋ Ajouter</button>`);
+    bindPanel(p); bindRowActions(p, renderFrais);
+    p.querySelector('[data-add="fee"]').addEventListener("click", () => { DATA.fees.push({ id: uid("fe"), label: "Nouveau frais", unit: "forfait", cost: 0, description: "" }); markDirty(); renderFrais(); });
+  }
+  function renderReglages() {
+    const S = DATA.settings, p = $("#panel-reglages");
+    p.innerHTML = acard("Réglages du devis", "", `<div class="grid-2">
+      <div class="field"><label>Nom de la société</label>${txtIn(S.company, "settings.company")}</div>
+      <div class="field"><label>TVA (%)</label>${numIn(S.tvaRate, "settings.tvaRate", 0.1)}</div>
+      <div class="field"><label>Objectif taux de marque (%) — marge / CA</label>${numIn(S.objectifTauxMarque, "settings.objectifTauxMarque")}</div>
+      <div class="field"><label>Objectif taux de marge (%) — marge / charges</label>${numIn(S.objectifTauxMarge, "settings.objectifTauxMarge")}</div>
+      <div class="field"><label>Validité du devis (jours)</label>${numIn(S.validityDays, "settings.validityDays")}</div>
+      <div class="field"><label>Code d'accès (PIN) — version déployée</label>${txtIn(S.pin, "settings.pin")}</div>
+      <div class="field" style="grid-column:1/-1"><label>Bloc émetteur (en-tête du devis)</label><textarea rows="3" data-path="settings.emitterBlock">${esc(S.emitterBlock || "")}</textarea></div>
+      <div class="field" style="grid-column:1/-1"><label>Mentions de bas de devis ({validite} = nb de jours)</label><textarea rows="3" data-path="settings.quoteFooter">${esc(S.quoteFooter || "")}</textarea></div>
+      <div class="field" style="grid-column:1/-1"><label>Google Sheets — URL du Web App Apps Script (…/exec)</label>${txtIn(S.sheetWebhookUrl, "settings.sheetWebhookUrl")}<span class="help">Chaque export PDF envoie aussi le devis (CA, marge, charges…) vers votre Google Sheet. Laisser vide pour désactiver. Voir apps-script/Code.gs dans le dépôt.</span></div>
+    </div>`);
+    bindPanel(p);
+  }
+  function bindSavebar() {
+    $("#btnSave").addEventListener("click", () => { adirty = false; const s = $("#status"); s.textContent = "Appliqué au devis"; s.classList.add("saved"); toast("Modifications prises en compte dans le devis."); });
+    $("#btnExport2").addEventListener("click", () => {
+      const banner = "/* HYC — données du générateur de devis (modèle : catalogue = prix de vente, PdS/gestion/frais = coûts).\n   Exporté depuis l'aperçu le " + todayFR() + ". Remplacer data.js à la racine du dépôt pour publier. */\n";
+      const content = banner + "window.HYC_DEFAULT_DATA = " + JSON.stringify(DATA, null, 2) + ";\n";
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/javascript;charset=utf-8" })); a.download = "data.js"; a.click(); URL.revokeObjectURL(a.href);
+      toast("data.js exporté — remplace-le sur GitHub pour publier.");
+    });
+    $("#btnImport").addEventListener("click", () => $("#fileImport").click());
+    $("#fileImport").addEventListener("change", e => {
+      const file = e.target.files[0]; if (!file) return; const r = new FileReader();
+      r.onload = () => { try { let txt = String(r.result).trim().replace(/^[\s\S]*?window\.HYC_DEFAULT_DATA\s*=\s*/, "").replace(/;\s*$/, ""); const parsed = JSON.parse(txt); if (!parsed.products || !parsed.projectTypes) throw 0; DATA = parsed; markDirty(); mountAdmin(); toast("Fichier importé et appliqué."); } catch (err) { toast("Import impossible : data.js ou JSON attendu."); } };
+      r.readAsText(file); e.target.value = "";
+    });
+    $("#btnResetData").addEventListener("click", () => { if (!confirm("Revenir aux tarifs par défaut ? Les modifications de l'aperçu seront perdues.")) return; DATA = deepClone(DEFAULT); mountAdmin(); toast("Tarifs par défaut restaurés."); });
+  }
+
+  route("devis");
+})();
+</script></body></html>
