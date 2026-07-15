@@ -1021,8 +1021,82 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("on"), 2700); }
   function setChip(text, cls) { const c = $("#dataChip"); if (!c) return; c.textContent = text; c.classList.remove("warn"); if (cls === "warn") c.classList.add("warn"); }
 
+  /* ---------------- tarifs partagés (stockés dans le Google Sheet via Apps Script) ----------------
+     Au chargement : l'outil récupère la dernière configuration publiée (GET ?action=config).
+     Dans « Tarifs » : chaque modification est publiée automatiquement (POST action=saveConfig),
+     avec un cache localStorage pour l'affichage instantané / hors ligne. */
+  const LS_KEY = "hyc-tarifs";
+  let currentRoute = "devis";
+  let configSupported = false; // passe à true si le script déployé gère le stockage des tarifs
+  let syncChip = { text: "Aperçu — données locales", cls: "" };
+  function setSyncChip(text, cls) { syncChip = { text, cls: cls || "" }; setChip(text, cls); }
+  function webhookUrl() { const u = String(DATA.settings.sheetWebhookUrl || "").trim(); return /^https:\/\/script\.google\.com\//.test(u) ? u : ""; }
+  function isValidConfig(c) { return !!(c && typeof c === "object" && Array.isArray(c.products) && Array.isArray(c.projectTypes) && c.settings); }
+
+  function loadLocalCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(LS_KEY));
+      if (!isValidConfig(cached)) return;
+      if (!cached.settings.sheetWebhookUrl) cached.settings.sheetWebhookUrl = DEFAULT.settings.sheetWebhookUrl;
+      DATA = cached;
+      setSyncChip("Tarifs locaux (cache)");
+    } catch (e) { /* cache illisible : on garde les tarifs par défaut */ }
+  }
+
+  function syncFromSheet() {
+    const url = webhookUrl(); if (!url) return;
+    fetch(url + "?action=config", { method: "GET" })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || res.ok !== true) throw 0;
+        configSupported = "config" in res;
+        if (!configSupported) { setSyncChip("Script Google à mettre à jour", "warn"); return; }
+        if (isValidConfig(res.config)) {
+          if (!res.config.settings.sheetWebhookUrl) res.config.settings.sheetWebhookUrl = url;
+          const changed = JSON.stringify(res.config) !== JSON.stringify(DATA);
+          if (changed) {
+            DATA = res.config;
+            try { localStorage.setItem(LS_KEY, JSON.stringify(DATA)); } catch (e) {}
+            route(currentRoute);
+            toast("Tarifs mis à jour depuis le Google Sheet.");
+          }
+        }
+        setSyncChip("Tarifs synchronisés ✓");
+      })
+      .catch(() => setSyncChip("Hors ligne — tarifs locaux", "warn"));
+  }
+  function autoRefresh() { if (currentRoute === "admin") return; syncFromSheet(); }
+
+  let pubTimer = null, pubInFlight = false, pubQueued = false;
+  function schedulePublish() { if (!webhookUrl()) return; clearTimeout(pubTimer); pubTimer = setTimeout(publishConfig, 2000); }
+  function publishConfig() {
+    clearTimeout(pubTimer); pubTimer = null;
+    const url = webhookUrl(); if (!url) return;
+    const s0 = $("#status");
+    if (!configSupported) { setSyncChip("Script Google à mettre à jour", "warn"); if (s0) { s0.textContent = "Publication impossible : mettez à jour le script Google (apps-script/Code.gs) puis redéployez une nouvelle version."; s0.classList.remove("saved"); } return; }
+    if (pubInFlight) { pubQueued = true; return; }
+    pubInFlight = true;
+    if (s0) { s0.textContent = "Publication des tarifs…"; s0.classList.remove("saved"); }
+    fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveConfig", pin: DATA.settings.pin || "", config: DATA }) })
+      .then(r => r.json())
+      .then(res => {
+        const s = $("#status");
+        if (res && res.ok && res.saved) {
+          try { localStorage.setItem(LS_KEY, JSON.stringify(DATA)); } catch (e) {}
+          setSyncChip("Tarifs publiés ✓");
+          if (s) { s.textContent = "Tarifs publiés — visibles par toute l'équipe."; s.classList.add("saved"); }
+        } else {
+          const msg = res && res.error ? res.error : "réponse inattendue du script";
+          if (s) { s.textContent = "Publication refusée : " + msg; s.classList.remove("saved"); }
+          toast("Publication des tarifs refusée : " + msg);
+        }
+      })
+      .catch(() => { const s = $("#status"); if (s) { s.textContent = "Publication impossible (réseau)."; s.classList.remove("saved"); } toast("Publication impossible : vérifiez la connexion."); })
+      .finally(() => { pubInFlight = false; if (pubQueued) { pubQueued = false; publishConfig(); } });
+  }
+
   /* ---------------- routeur ---------------- */
-  function route(name) { $$(".viewswitch button").forEach(b => b.setAttribute("aria-current", b.dataset.view === name ? "true" : "false")); if (name === "admin") mountAdmin(); else mountDevis(); }
+  function route(name) { currentRoute = name; $$(".viewswitch button").forEach(b => b.setAttribute("aria-current", b.dataset.view === name ? "true" : "false")); if (name === "admin") mountAdmin(); else mountDevis(); }
   $$(".viewswitch button").forEach(b => b.addEventListener("click", () => route(b.dataset.view)));
 
   /* =====================================================================
@@ -1128,7 +1202,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function mountDevis() {
     view.className = "layout";
     view.innerHTML = DEVIS_HTML;
-    setChip("Aperçu — données en mémoire");
+    setChip(syncChip.text, syncChip.cls);
     buildMission(); buildCatalog(); buildFees(); renderPds(); renderGestion();
     $("#addPds").addEventListener("click", () => { state.pds.push({ id: uid("pds"), mode: "forfait", prestationId: DATA.pdsForfait[0] ? DATA.pdsForfait[0].id : "", group: "specialiste", profileId: DATA.pdsProfiles[0] ? DATA.pdsProfiles[0].id : "", unit: "jour", qty: 1 }); renderPds(); recompute(); });
     $("#addGestion").addEventListener("click", () => { state.gestion.push({ id: uid("g"), memberId: DATA.team[0] ? DATA.team[0].id : "", unit: "jour", qty: 1 }); renderGestion(); recompute(); });
@@ -1476,8 +1550,9 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
      ===================================================================== */
   let adirty = false;
   const ADMIN_HTML = `
-    <p class="note"><b>Aperçu :</b> tes modifications s'appliquent <b>immédiatement au devis</b> (tout est en mémoire).
-      Pour publier de nouveaux tarifs à toute l'équipe, clique <b>Exporter data.js</b> et remplace le fichier dans le dépôt GitHub. Cet aperçu ne conserve rien après fermeture de l'onglet.</p>
+    <p class="note"><b>Tarifs partagés :</b> tes modifications s'appliquent <b>immédiatement au devis</b> et sont
+      <b>publiées automatiquement</b> à toute l'équipe (stockage dans le Google Sheet, ~2 s après la dernière modification).
+      L'outil recharge les derniers tarifs publiés à chaque ouverture de la page.</p>
     <nav class="tabs" id="tabs">
       <button class="tab" data-tab="marges" aria-selected="true">Marges</button>
       <button class="tab" data-tab="catalogue" aria-selected="false">Catalogue (prix de vente)</button>
@@ -1506,11 +1581,11 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function mountAdmin() {
     view.className = "";
     view.innerHTML = ADMIN_HTML;
-    setChip("Aperçu — données en mémoire");
+    setChip(syncChip.text, syncChip.cls);
     $("#tabs").addEventListener("click", e => { const b = e.target.closest(".tab"); if (!b) return; $$(".tab").forEach(t => t.setAttribute("aria-selected", t === b ? "true" : "false")); $$(".panel").forEach(p => p.classList.toggle("on", p.id === "panel-" + b.dataset.tab)); });
     renderAll(); bindSavebar();
   }
-  function markDirty() { adirty = true; const s = $("#status"); if (s) { s.textContent = "Modifications appliquées"; s.classList.add("saved"); } }
+  function markDirty() { adirty = true; const s = $("#status"); if (s) { s.textContent = "Modifications appliquées — publication automatique dans 2 s…"; s.classList.remove("saved"); } schedulePublish(); }
   function renderAll() { renderMarges(); renderCatalogue(); renderForfait(); renderTemps(); renderEquipe(); renderFrais(); renderReglages(); }
   function acard(title, hint, inner) { return `<div class="acard"><div class="acard-head"><h2>${title}</h2>${hint ? `<span class="hint">${hint}</span>` : ""}</div><div class="acard-body table-scroll">${inner}</div></div>`; }
   function numIn(v, path, step) { return `<input class="num" type="number" step="${step || 1}" min="0" value="${v == null ? "" : v}" data-path="${path}">`; }
@@ -1572,12 +1647,12 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       <div class="field"><label>Code d'accès (PIN) — version déployée</label>${txtIn(S.pin, "settings.pin")}</div>
       <div class="field" style="grid-column:1/-1"><label>Bloc émetteur (en-tête du devis)</label><textarea rows="3" data-path="settings.emitterBlock">${esc(S.emitterBlock || "")}</textarea></div>
       <div class="field" style="grid-column:1/-1"><label>Mentions de bas de devis ({validite} = nb de jours)</label><textarea rows="3" data-path="settings.quoteFooter">${esc(S.quoteFooter || "")}</textarea></div>
-      <div class="field" style="grid-column:1/-1"><label>Google Sheets — URL du Web App Apps Script (…/exec)</label>${txtIn(S.sheetWebhookUrl, "settings.sheetWebhookUrl")}<span class="help">Chaque export PDF envoie aussi le devis (CA, marge, charges…) vers votre Google Sheet. Laisser vide pour désactiver. Voir apps-script/Code.gs dans le dépôt.</span></div>
+      <div class="field" style="grid-column:1/-1"><label>Google Sheets — URL du Web App Apps Script (…/exec)</label>${txtIn(S.sheetWebhookUrl, "settings.sheetWebhookUrl")}<span class="help">Sert à deux choses : chaque export PDF envoie le devis (CA, marge, charges…) vers votre Google Sheet, et les tarifs modifiés ici sont publiés/rechargés automatiquement pour toute l'équipe. Laisser vide pour désactiver. Voir apps-script/Code.gs dans le dépôt.</span></div>
     </div>`);
     bindPanel(p);
   }
   function bindSavebar() {
-    $("#btnSave").addEventListener("click", () => { adirty = false; const s = $("#status"); s.textContent = "Appliqué au devis"; s.classList.add("saved"); toast("Modifications prises en compte dans le devis."); });
+    $("#btnSave").addEventListener("click", () => { adirty = false; const s = $("#status"); s.textContent = "Appliqué au devis"; s.classList.add("saved"); toast("Modifications prises en compte dans le devis."); publishConfig(); });
     $("#btnExport2").addEventListener("click", () => {
       const banner = "/* HYC — données du générateur de devis (modèle : catalogue = prix de vente, PdS/gestion/frais = coûts).\n   Exporté depuis l'aperçu le " + todayFR() + ". Remplacer data.js à la racine du dépôt pour publier. */\n";
       const content = banner + "window.HYC_DEFAULT_DATA = " + JSON.stringify(DATA, null, 2) + ";\n";
@@ -1590,9 +1665,13 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       r.onload = () => { try { let txt = String(r.result).trim().replace(/^[\s\S]*?window\.HYC_DEFAULT_DATA\s*=\s*/, "").replace(/;\s*$/, ""); const parsed = JSON.parse(txt); if (!parsed.products || !parsed.projectTypes) throw 0; DATA = parsed; markDirty(); mountAdmin(); toast("Fichier importé et appliqué."); } catch (err) { toast("Import impossible : data.js ou JSON attendu."); } };
       r.readAsText(file); e.target.value = "";
     });
-    $("#btnResetData").addEventListener("click", () => { if (!confirm("Revenir aux tarifs par défaut ? Les modifications de l'aperçu seront perdues.")) return; DATA = deepClone(DEFAULT); mountAdmin(); toast("Tarifs par défaut restaurés."); });
+    $("#btnResetData").addEventListener("click", () => { if (!confirm("Revenir aux tarifs par défaut ? Ils seront publiés à toute l'équipe.")) return; DATA = deepClone(DEFAULT); mountAdmin(); toast("Tarifs par défaut restaurés."); schedulePublish(); });
   }
 
+  loadLocalCache();
   route("devis");
+  syncFromSheet();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) autoRefresh(); });
+  setInterval(autoRefresh, 5 * 60 * 1000);
 })();
 </script></body></html>
