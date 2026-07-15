@@ -39,3 +39,24 @@ Une feuille `Devis` est créée automatiquement avec les en-têtes ; chaque expo
 > ⚠️ Après toute modification du script, refaites *Déployer → Gérer les déploiements →
 > ✏️ → Nouvelle version*, sinon l'URL `/exec` sert l'ancienne version.
 > Champ laissé vide = envoi désactivé (l'export PDF fonctionne normalement).
+
+## Tarifs partagés (mise à jour automatique de l'outil)
+
+Les tarifs (catalogue, rémunérations PdS, équipe, frais, réglages) sont **partagés
+par toute l'équipe** via le même script Apps Script :
+
+- Chaque modification dans l'onglet **Tarifs** est **publiée automatiquement**
+  (~2 secondes après la dernière saisie) — le statut en bas de page confirme
+  « Tarifs publiés — visibles par toute l'équipe ».
+- À chaque ouverture de la page, l'outil **recharge les derniers tarifs publiés**
+  (puis se rafraîchit périodiquement). Un cache local (`localStorage`) permet un
+  affichage instantané et un mode hors ligne.
+- La publication est protégée par le **PIN** : la constante `PIN` dans
+  `apps-script/Code.gs` doit correspondre au champ « Code d'accès (PIN) » des
+  réglages de l'outil (par défaut `hyc2026`). Si vous changez l'un, changez l'autre.
+
+> ⚠️ Cette fonction nécessite la dernière version de `apps-script/Code.gs` :
+> après l'avoir collée dans l'éditeur Apps Script, faites *Déployer → Gérer les
+> déploiements → ✏️ → Nouvelle version* (l'URL `/exec` ne change pas). Tant que
+> le script n'est pas à jour, l'outil affiche « Script Google à mettre à jour »
+> et ne publie rien.
