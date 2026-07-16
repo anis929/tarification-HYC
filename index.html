@@ -1106,7 +1106,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     <nav class="stepnav">
       <a href="#s-mission" data-step="s-mission"><span class="n">1</span> Mission</a>
       <a href="#s-presta" data-step="s-presta"><span class="n">2</span> Prestations facturées</a>
-      <a href="#s-couts" data-step="s-couts"><span class="n">3</span> Vos coûts</a>
+      <a href="#s-couts" data-step="s-couts"><span class="n">3</span> PdS, gestion &amp; frais</a>
     </nav>
     <div class="worka">
       <section class="card step" id="s-mission">
@@ -1124,7 +1124,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       <section class="card step" id="s-presta">
         <div class="step-head"><div class="step-badge rev">2</div>
           <div><h2>Prestations proposées</h2><div class="sub">Ce que paie le client — coche les prestations du catalogue</div></div>
-          <div class="tot rev"><span class="lab">Chiffre d'affaires</span><span class="amt" id="revTot">0 €</span></div></div>
+          <div class="tot rev"><span class="lab">CA catalogue</span><span class="amt" id="revTot">0 €</span></div></div>
         <div class="step-body">
           <input id="prodSearch" class="search" type="search" placeholder="Rechercher une prestation…">
           <div id="catalog" style="margin-top:12px"></div>
@@ -1133,9 +1133,9 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
 
       <section class="card step" id="s-couts">
         <div class="step-head"><div class="step-badge cost">3</div>
-          <div><h2>Charges de mission <span class="tag-int">n'apparaît pas sur le devis client</span></h2>
-            <div class="sub">Coûts directs de la mission — honoraires PdS, gestion, frais</div></div>
-          <div class="tot cost"><span class="lab">Charges directes</span><span class="amt" id="costTot">0 €</span></div></div>
+          <div><h2>PdS, gestion &amp; frais <span class="tag-int">refacturés — reportés sur le devis client</span></h2>
+            <div class="sub">Payés par le client (honoraires PdS, temps équipe HYC, frais) — comptés en charge interne pour la marge</div></div>
+          <div class="tot cost"><span class="lab">Refacturé au client</span><span class="amt" id="costTot">0 €</span></div></div>
         <div class="step-body">
           <div class="costblock">
             <div class="costblock-head"><h3>Professionnels de santé</h3><span class="bsub">honoraires — forfait/jour ou au temps</span><span class="btot" id="pdsTot">0 €</span></div>
@@ -1177,11 +1177,14 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
           <div class="floor" id="floorLine" hidden></div>
           <hr class="rc-sep">
           <div class="rc-rows">
-            <div class="rc-row rev"><span>Chiffre d'affaires</span><span class="v" id="rcRev">0 €</span></div>
-            <div class="rc-row cost"><span>− Professionnels de santé <em class="w" id="wPds"></em></span><span class="v" id="rcPds">0 €</span></div>
-            <div class="rc-row cost"><span>− Temps de gestion <em class="w" id="wGestion"></em></span><span class="v" id="rcGestion">0 €</span></div>
-            <div class="rc-row cost"><span>− Frais annexes <em class="w" id="wFrais"></em></span><span class="v" id="rcFrais">0 €</span></div>
-            <div class="rc-row cost sub"><span>= Charges directes <em class="w" id="wCosts"></em></span><span class="v" id="rcCosts">0 €</span></div>
+            <div class="rc-row rev"><span>Chiffre d'affaires (devis)</span><span class="v" id="rcRev">0 €</span></div>
+            <div class="rc-row"><span>· dont catalogue</span><span class="v" id="rcCat">0 €</span></div>
+            <div class="rc-row"><span>· dont refacturé (PdS, gestion, frais)</span><span class="v" id="rcRefac">0 €</span></div>
+            <hr class="rc-sep">
+            <div class="rc-row cost"><span>− Rémunération PdS <em class="w" id="wPds"></em></span><span class="v" id="rcPds">0 €</span></div>
+            <div class="rc-row cost"><span>− Temps équipe HYC <em class="w" id="wGestion"></em></span><span class="v" id="rcGestion">0 €</span></div>
+            <div class="rc-row cost"><span>− Frais &amp; sous-traitance <em class="w" id="wFrais"></em></span><span class="v" id="rcFrais">0 €</span></div>
+            <div class="rc-row cost sub"><span>= Charges internes <em class="w" id="wCosts"></em></span><span class="v" id="rcCosts">0 €</span></div>
             <hr class="rc-sep">
             <div class="rc-row gross"><span>= Marge brute</span><span class="v" id="rcGross">0 €</span></div>
           </div>
@@ -1363,10 +1366,13 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     return items;
   }
   function totals(items) {
-    let revenue = 0, pds = 0, gestion = 0, frais = 0;
-    items.forEach(it => { const a = it.pu * it.qty; if (it.section === "prod") revenue += a; else if (it.section === "pds") pds += a; else if (it.section === "gestion") gestion += a; else frais += a; });
+    let cat = 0, pds = 0, gestion = 0, frais = 0;
+    items.forEach(it => { const a = it.pu * it.qty; if (it.section === "prod") cat += a; else if (it.section === "pds") pds += a; else if (it.section === "gestion") gestion += a; else frais += a; });
+    // PdS, gestion et frais sont refacturés au client : ils entrent dans le CA du devis
+    // ET restent des charges internes pour le calcul de la marge.
     const costs = round2(pds + gestion + frais);
-    return { revenue: round2(revenue), pds: round2(pds), gestion: round2(gestion), frais: round2(frais), costs };
+    const revenue = round2(cat + pds + gestion + frais);
+    return { catalogue: round2(cat), revenue, pds: round2(pds), gestion: round2(gestion), frais: round2(frais), costs };
   }
   function currentType() { return DATA.projectTypes.find(t => t.id === state.projectType) || null; }
 
@@ -1386,7 +1392,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     const CA = t.revenue, costs = t.costs;
     const price = state.price != null ? state.price : CA;
 
-    $("#revTot").textContent = fmtEUR(CA);
+    $("#revTot").textContent = fmtEUR(t.catalogue);
     $("#pdsTot").textContent = fmtEUR(t.pds);
     $("#gestionTot").textContent = fmtEUR(t.gestion);
     $("#feesTot").textContent = fmtEUR(t.frais);
@@ -1396,7 +1402,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     if (updateField !== false) input.value = state.price != null ? String(state.price).replace(".", ",") : (CA ? String(CA).replace(".", ",") : "");
     $("#priceReset").hidden = state.price == null || round2(state.price) === CA;
     const remise = round2(CA - price);
-    $("#priceCap").innerHTML = "Total des prestations : <b>" + fmtEUR(CA) + "</b>" + (Math.abs(remise) >= 0.01 ? (remise > 0 ? " · remise " + fmtEUR(remise) : " · majoration " + fmtEUR(-remise)) : "");
+    $("#priceCap").innerHTML = "Total du devis (catalogue + refacturations) : <b>" + fmtEUR(CA) + "</b>" + (Math.abs(remise) >= 0.01 ? (remise > 0 ? " · remise " + fmtEUR(remise) : " · majoration " + fmtEUR(-remise)) : "");
 
     const tva = parseNum(DATA.settings.tvaRate);
     $("#ttcBlock").innerHTML = price > 0
@@ -1404,6 +1410,8 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       : '<div class="tc-row"><span>Ajoute une prestation facturée</span><span class="v">—</span></div>';
 
     $("#rcRev").textContent = fmtEUR(CA);
+    $("#rcCat").textContent = fmtEUR(t.catalogue);
+    $("#rcRefac").textContent = fmtEUR(costs);
     $("#rcPds").textContent = fmtEUR(t.pds);
     $("#rcGestion").textContent = fmtEUR(t.gestion);
     $("#rcFrais").textContent = fmtEUR(t.frais);
@@ -1472,19 +1480,18 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     }
   }
 
-  /* --- export PDF (devis client : produits uniquement) --- */
+  /* --- export PDF (devis client : toutes les lignes, y compris PdS/gestion/frais refacturés) --- */
   function exportPDF() {
     const items = computeItems(), t = totals(items);
-    const products = items.filter(it => it.section === "prod");
-    if (!products.length || t.revenue <= 0) { toast("Ajoute au moins une prestation facturée avant d'exporter."); return; }
+    if (!items.length || t.revenue <= 0) { toast("Ajoute au moins une prestation avant d'exporter."); return; }
     const price = state.price != null ? state.price : t.revenue;
-    buildPrintDoc(products, t.revenue, price);
-    sendQuoteToSheet(products, t, price);
+    buildPrintDoc(items, t.revenue, price);
+    sendQuoteToSheet(items, t, price);
     const prev = document.title; document.title = (state.ref || "Devis") + " — " + (state.client || "HYC"); window.print(); document.title = prev;
   }
 
   /* --- envoi Google Sheets (Web App Apps Script, réglage « URL Google Sheets ») --- */
-  function sendQuoteToSheet(products, t, price) {
+  function sendQuoteToSheet(items, t, price) {
     const url = String(DATA.settings.sheetWebhookUrl || "").trim();
     if (!/^https:\/\/script\.google\.com\//.test(url)) return;
     const tva = parseNum(DATA.settings.tvaRate), type = currentType();
@@ -1497,8 +1504,8 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       responsable: state.owner || "",
       typeProjet: type ? type.label : "",
       modeDevis: state.pmode === "forfait" ? "forfaitaire" : "détaillé",
-      prestations: products.map(p => p.label + " × " + String(p.qty).replace(".", ",") + " " + shortUnit(p.unit)).join(" | "),
-      caCatalogueHT: t.revenue,
+      prestations: items.map(p => p.label + " × " + String(p.qty).replace(".", ",") + " " + shortUnit(p.unit)).join(" | "),
+      caCatalogueHT: t.catalogue,
       prixVenteHT: round2(price),
       remiseHT: round2(t.revenue - price),
       tvaPct: tva,
@@ -1518,14 +1525,14 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
         .catch(() => toast("Devis exporté, mais l'envoi au Google Sheet a échoué."));
     } catch (err) { toast("Devis exporté, mais l'envoi au Google Sheet a échoué."); }
   }
-  function buildPrintDoc(products, CA, price) {
+  function buildPrintDoc(lines, CA, price) {
     const S = DATA.settings, tva = parseNum(S.tvaRate);
     let rows = "", clientLines = [];
     if (state.pmode === "forfait") {
-      const incl = products.map(p => p.label).join(", ");
+      const incl = lines.map(p => p.label).join(", ");
       clientLines = [{ label: state.title || "Prestation Hack Your Care", description: incl ? "Comprend : " + incl + "." : "", qty: 1, unit: "forfait", total: round2(price) }];
     } else {
-      clientLines = products.map(p => ({ label: p.label, description: p.description, qty: p.qty, unit: p.unit, total: round2(p.pu * p.qty) }));
+      clientLines = lines.map(p => ({ label: p.label, description: p.description, qty: p.qty, unit: p.unit, total: round2(p.pu * p.qty) }));
       const remise = round2(price - CA);
       if (remise <= -0.01) clientLines.push({ label: "Remise commerciale", description: "", qty: 1, unit: "forfait", total: remise });
       else if (remise >= 0.01) clientLines.push({ label: "Prestations complémentaires", description: "", qty: 1, unit: "forfait", total: remise });
@@ -1612,7 +1619,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function renderForfait() {
     const typeOpts = t => ["Formation", "Communication", "Marketing", "Expertise"].map(x => `<option ${x === t ? "selected" : ""}>${x}</option>`).join("");
     const rows = DATA.pdsForfait.map((f, i) => `<tr><td><select data-path="pdsForfait.${i}.projectType">${typeOpts(f.projectType)}</select></td><td>${txtIn(f.label, `pdsForfait.${i}.label`, 220)}</td><td>${numIn(f.rates.generaliste, `pdsForfait.${i}.rates.generaliste`, 50)}</td><td>${numIn(f.rates.specialiste, `pdsForfait.${i}.rates.specialiste`, 50)}</td><td>${numIn(f.rates.paramedical, `pdsForfait.${i}.rates.paramedical`, 50)}</td><td><button class="rm" data-del="pdsForfait" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-forfait"); p.innerHTML = acard("Rémunération PdS — forfait/jour", "Coût interne · un tarif à 0 déclenche une alerte côté devis", `<table class="grid"><thead><tr><th>Type</th><th>Prestation</th><th>Généraliste €</th><th>Spécialiste €</th><th>Paramédical €</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="forfait" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-forfait"); p.innerHTML = acard("Rémunération PdS — forfait/jour", "Refacturé au client sur le devis · compté en charge interne pour la marge · un tarif à 0 déclenche une alerte", `<table class="grid"><thead><tr><th>Type</th><th>Prestation</th><th>Généraliste €</th><th>Spécialiste €</th><th>Paramédical €</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="forfait" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderForfait);
     p.querySelector('[data-add="forfait"]').addEventListener("click", () => { DATA.pdsForfait.push({ id: uid("pf"), projectType: "Formation", label: "Nouvelle prestation", rates: { generaliste: 0, specialiste: 0, paramedical: 0 } }); markDirty(); renderForfait(); });
   }
@@ -1625,14 +1632,14 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   }
   function renderEquipe() {
     const rows = DATA.team.map((m, i) => `<tr><td>${txtIn(m.label, `team.${i}.label`, 180)}</td><td>${numIn(m.rateHour, `team.${i}.rateHour`, 5)}</td><td>${numIn(m.rateDay, `team.${i}.rateDay`, 25)}</td><td><button class="rm" data-del="team" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-equipe"); p.innerHTML = acard("Équipe projet — coûts", "Coût jour = coût horaire × 7 dans le modèle source", `<table class="grid"><thead><tr><th>Gestionnaire</th><th>Coût € / heure</th><th>Coût € / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="member" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-equipe"); p.innerHTML = acard("Équipe projet — temps de gestion", "Refacturé au client sur le devis · compté en charge interne · coût jour = coût horaire × 7", `<table class="grid"><thead><tr><th>Gestionnaire</th><th>Coût € / heure</th><th>Coût € / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="member" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderEquipe);
     p.querySelector('[data-add="member"]').addEventListener("click", () => { DATA.team.push({ id: uid("tm"), label: "Nouveau membre", rateHour: 0, rateDay: 0 }); markDirty(); renderEquipe(); });
   }
   function renderFrais() {
     const unitOpts = u => ["forfait", "jour", "heure", "unité"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
     const rows = DATA.fees.map((f, i) => `<tr><td>${txtIn(f.label, `fees.${i}.label`, 260)}</td><td><select data-path="fees.${i}.unit">${unitOpts(f.unit)}</select></td><td>${numIn(f.cost, `fees.${i}.cost`, 25)}</td><td>${txtIn(f.description, `fees.${i}.description`, 300)}</td><td><button class="rm" data-del="fees" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-frais"); p.innerHTML = acard("Frais annexes — coûts", "Déplacements, montage vidéo, sourcing…", `<table class="grid"><thead><tr><th>Frais</th><th>Unité</th><th>Coût € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="fee" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-frais"); p.innerHTML = acard("Frais annexes — refacturés", "Déplacements, montage vidéo (sous-traitance), sourcing… Refacturés au client et comptés en charge interne.", `<table class="grid"><thead><tr><th>Frais</th><th>Unité</th><th>Coût € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="fee" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderFrais);
     p.querySelector('[data-add="fee"]').addEventListener("click", () => { DATA.fees.push({ id: uid("fe"), label: "Nouveau frais", unit: "forfait", cost: 0, description: "" }); markDirty(); renderFrais(); });
   }
