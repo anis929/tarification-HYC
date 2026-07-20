@@ -208,6 +208,14 @@ input:disabled { background: #f0f4f2; color: var(--muted); }
 .fee-row { display: grid; grid-template-columns: minmax(0,1fr) 118px 84px 92px; gap: 10px; align-items: center; padding: 9px 4px; border-top: 1px dashed var(--line); }
 .fee-row:first-child { border-top: 0; }
 .fee-row .prod-total { color: var(--slate); }
+.fee-row.rev .prod-total { color: var(--brand-deep); }
+.fee-row.rev .prod-total.zero { color: var(--line-strong); font-weight: 400; }
+
+/* blocs facturés (étape 2) : même structure que les blocs coûts, accent vert */
+.costblock.rev { border-color: var(--brand-100); background: #fbfefd; }
+.costblock.rev .btot { color: var(--brand-deep); }
+.dyn-row.rev .line-total, .dyn-row.rev .line-total b { color: var(--brand-deep); }
+.row-cfrais { grid-template-columns: minmax(0,1.5fr) 88px 116px 110px 30px; }
 
 /* ---------- boutons ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: 9px 15px; border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: .12s; }
@@ -310,6 +318,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   .summary { position: static; }
   .row-pds { grid-template-columns: 1fr 1fr; }
   .row-gestion { grid-template-columns: 1fr 1fr; }
+  .row-cfrais { grid-template-columns: 1fr 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
   .prod-row { grid-template-columns: minmax(0,1fr) 80px 80px; }
   .prod-pu { display: none; }
@@ -967,14 +976,16 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       "rateDay": 1750
     }
   ],
-  "fees": [
+  "recrutement": [
     {
       "id": "recrutement-pds",
       "label": "Recrutement / sourcing PdS",
       "unit": "forfait",
-      "cost": 500,
-      "description": "Frais de sourcing et de recrutement des professionnels de santé mobilisés."
-    },
+      "price": 500,
+      "description": "Sourcing et recrutement des professionnels de santé mobilisés pour la mission."
+    }
+  ],
+  "fees": [
     {
       "id": "deplacement",
       "label": "Déplacement (forfait jour)",
@@ -991,8 +1002,10 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     }
   ]
 };</script><script>/* HYC — Générateur de devis (aperçu 1 fichier)
-   Modèle : catalogue = prix de vente (CA) ; PdS + gestion + frais = coûts internes.
-   Marge = (prix de vente − coûts) / prix de vente. DEFAULT injecté avant ce script. */
+   Modèle : étape 2 = prestations proposées au client (recrutement/sourcing PdS,
+   prestations catalogue, gestion de projet, frais annexes) → CA du devis ;
+   étape 3 = charges de mission (coût PdS, temps chargé HYC, prestataires externes).
+   Marge = prix de vente − charges. DEFAULT injecté avant ce script. */
 (function () {
   "use strict";
 
@@ -1014,8 +1027,25 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   let DATA = deepClone(DEFAULT);
   const view = $("#view");
   function defaultRef() { const d = new Date(), p = n => String(n).padStart(2, "0"); return "DV-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()); }
-  function makeState() { return { client: "", owner: "", title: "", projectType: "", ref: defaultRef(), products: {}, pds: [], gestion: [], fees: {}, price: null, pmode: "detail" }; }
+  function makeState() { return { client: "", owner: "", title: "", projectType: "", ref: defaultRef(), recrutement: {}, products: {}, gestionFact: [], fees: {}, pds: [], gestion: [], chargesFrais: [], price: null, pmode: "detail" }; }
   let state = makeState();
+
+  /* Migration des configurations publiées avant la refonte « Charges de mission » :
+     le recrutement/sourcing PdS quitte les frais annexes pour devenir une section
+     facturée de l'étape 2 (tableau DATA.recrutement, prix de vente). */
+  function migrateData(d) {
+    if (!d || typeof d !== "object") return d;
+    if (!Array.isArray(d.fees)) d.fees = [];
+    if (!Array.isArray(d.recrutement)) {
+      const isRec = f => f && (f.id === "recrutement-pds" || /recrutement|sourcing/i.test(String(f.label || "")));
+      const moved = d.fees.filter(isRec);
+      d.fees = d.fees.filter(f => !isRec(f));
+      d.recrutement = moved.length
+        ? moved.map(f => ({ id: f.id, label: f.label, unit: f.unit || "forfait", price: parseNum(f.cost != null ? f.cost : f.price), description: f.description || "" }))
+        : deepClone(DEFAULT.recrutement);
+    }
+    return d;
+  }
 
   let toastTimer = null;
   function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.add("on"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("on"), 2700); }
@@ -1038,7 +1068,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       const cached = JSON.parse(localStorage.getItem(LS_KEY));
       if (!isValidConfig(cached)) return;
       if (!cached.settings.sheetWebhookUrl) cached.settings.sheetWebhookUrl = DEFAULT.settings.sheetWebhookUrl;
-      DATA = cached;
+      DATA = migrateData(cached);
       setSyncChip("Tarifs locaux (cache)");
     } catch (e) { /* cache illisible : on garde les tarifs par défaut */ }
   }
@@ -1053,9 +1083,10 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
         if (!configSupported) { setSyncChip("Script Google à mettre à jour", "warn"); return; }
         if (isValidConfig(res.config)) {
           if (!res.config.settings.sheetWebhookUrl) res.config.settings.sheetWebhookUrl = url;
-          const changed = JSON.stringify(res.config) !== JSON.stringify(DATA);
+          const cfg = migrateData(res.config);
+          const changed = JSON.stringify(cfg) !== JSON.stringify(DATA);
           if (changed) {
-            DATA = res.config;
+            DATA = cfg;
             try { localStorage.setItem(LS_KEY, JSON.stringify(DATA)); } catch (e) {}
             route(currentRoute);
             toast("Tarifs mis à jour depuis le Google Sheet.");
@@ -1105,8 +1136,8 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   const DEVIS_HTML = `
     <nav class="stepnav">
       <a href="#s-mission" data-step="s-mission"><span class="n">1</span> Mission</a>
-      <a href="#s-presta" data-step="s-presta"><span class="n">2</span> Prestations facturées</a>
-      <a href="#s-couts" data-step="s-couts"><span class="n">3</span> PdS, gestion &amp; frais</a>
+      <a href="#s-presta" data-step="s-presta"><span class="n">2</span> Prestations proposées</a>
+      <a href="#s-couts" data-step="s-couts"><span class="n">3</span> Charges de mission</a>
     </nav>
     <div class="worka">
       <section class="card step" id="s-mission">
@@ -1123,33 +1154,50 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
 
       <section class="card step" id="s-presta">
         <div class="step-head"><div class="step-badge rev">2</div>
-          <div><h2>Prestations proposées</h2><div class="sub">Ce que paie le client — coche les prestations du catalogue</div></div>
-          <div class="tot rev"><span class="lab">CA catalogue</span><span class="amt" id="revTot">0 €</span></div></div>
+          <div><h2>Prestations proposées</h2><div class="sub">Ce que paie le client — recrutement, prestations, gestion de projet et frais annexes</div></div>
+          <div class="tot rev"><span class="lab">CA du devis</span><span class="amt" id="revTot">0 €</span></div></div>
         <div class="step-body">
-          <input id="prodSearch" class="search" type="search" placeholder="Rechercher une prestation…">
-          <div id="catalog" style="margin-top:12px"></div>
+          <div class="costblock rev">
+            <div class="costblock-head"><h3>Recrutement / sourcing PdS</h3><span class="bsub">sourcing et recrutement des professionnels de santé</span><span class="btot" id="recTot">0 €</span></div>
+            <div id="recList"></div>
+          </div>
+          <div class="costblock rev">
+            <div class="costblock-head"><h3>Prestation</h3><span class="bsub">expertise · communication · formation et accompagnement · marketing et rédaction</span><span class="btot" id="prestaTot">0 €</span></div>
+            <input id="prodSearch" class="search" type="search" placeholder="Rechercher une prestation…">
+            <div id="catalog" style="margin-top:12px"></div>
+          </div>
+          <div class="costblock rev">
+            <div class="costblock-head"><h3>Gestion de projet</h3><span class="bsub">pilotage de la mission facturé au client</span><span class="btot" id="gfactTot">0 €</span></div>
+            <div id="gfactList" class="dyn-list"></div>
+            <button id="addGfact" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter une ligne de gestion</button>
+          </div>
+          <div class="costblock rev">
+            <div class="costblock-head"><h3>Frais annexes</h3><span class="bsub">déplacement, montage vidéo… facturés au client</span><span class="btot" id="feesTot">0 €</span></div>
+            <div id="feesList"></div>
+          </div>
         </div>
       </section>
 
       <section class="card step" id="s-couts">
         <div class="step-head"><div class="step-badge cost">3</div>
-          <div><h2>PdS, gestion &amp; frais <span class="tag-int">refacturés — reportés sur le devis client</span></h2>
-            <div class="sub">Payés par le client (honoraires PdS, temps équipe HYC, frais) — comptés en charge interne pour la marge</div></div>
-          <div class="tot cost"><span class="lab">Refacturé au client</span><span class="amt" id="costTot">0 €</span></div></div>
+          <div><h2>Charges de mission <span class="tag-int">internes — servent au calcul de la marge</span></h2>
+            <div class="sub">Ce que la mission coûte à HYC : rémunération PdS, temps chargé des salariés, prestataires externes</div></div>
+          <div class="tot cost"><span class="lab">Charges de mission</span><span class="amt" id="costTot">0 €</span></div></div>
         <div class="step-body">
           <div class="costblock">
-            <div class="costblock-head"><h3>Professionnels de santé</h3><span class="bsub">honoraires — forfait/jour ou au temps</span><span class="btot" id="pdsTot">0 €</span></div>
+            <div class="costblock-head"><h3>Coût professionnel de santé</h3><span class="bsub">rémunération du/des professionnel(s) de santé</span><span class="btot" id="pdsTot">0 €</span></div>
             <div id="pdsList" class="dyn-list"></div>
             <button id="addPds" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter un intervenant</button>
           </div>
           <div class="costblock">
-            <div class="costblock-head"><h3>Temps de gestion de projet</h3><span class="bsub">temps équipe HYC</span><span class="btot" id="gestionTot">0 €</span></div>
+            <div class="costblock-head"><h3>Coût gestion de projet</h3><span class="bsub">temps chargé des salariés HYC</span><span class="btot" id="gestionTot">0 €</span></div>
             <div id="gestionList" class="dyn-list"></div>
             <button id="addGestion" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter du temps de gestion</button>
           </div>
           <div class="costblock">
-            <div class="costblock-head"><h3>Frais annexes</h3><span class="bsub">déplacement, montage, sourcing…</span><span class="btot" id="feesTot">0 €</span></div>
-            <div id="feesList"></div>
+            <div class="costblock-head"><h3>Coût frais annexes</h3><span class="bsub">rémunération des prestataires externes — à renseigner si connue (devis prestataire, historique de coût…)</span><span class="btot" id="cfraisTot">0 €</span></div>
+            <div id="cfraisList" class="dyn-list"></div>
+            <button id="addCfrais" class="btn btn-sm btn-add" type="button" style="margin-top:10px">＋ Ajouter un coût externe</button>
           </div>
         </div>
       </section>
@@ -1178,13 +1226,15 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
           <hr class="rc-sep">
           <div class="rc-rows">
             <div class="rc-row rev"><span>Chiffre d'affaires (devis)</span><span class="v" id="rcRev">0 €</span></div>
-            <div class="rc-row"><span>· dont catalogue</span><span class="v" id="rcCat">0 €</span></div>
-            <div class="rc-row"><span>· dont refacturé (PdS, gestion, frais)</span><span class="v" id="rcRefac">0 €</span></div>
+            <div class="rc-row"><span>· dont recrutement / sourcing PdS</span><span class="v" id="rcRec">0 €</span></div>
+            <div class="rc-row"><span>· dont prestations</span><span class="v" id="rcCat">0 €</span></div>
+            <div class="rc-row"><span>· dont gestion de projet</span><span class="v" id="rcGfact">0 €</span></div>
+            <div class="rc-row"><span>· dont frais annexes</span><span class="v" id="rcFees">0 €</span></div>
             <hr class="rc-sep">
-            <div class="rc-row cost"><span>− Rémunération PdS <em class="w" id="wPds"></em></span><span class="v" id="rcPds">0 €</span></div>
-            <div class="rc-row cost"><span>− Temps équipe HYC <em class="w" id="wGestion"></em></span><span class="v" id="rcGestion">0 €</span></div>
-            <div class="rc-row cost"><span>− Frais &amp; sous-traitance <em class="w" id="wFrais"></em></span><span class="v" id="rcFrais">0 €</span></div>
-            <div class="rc-row cost sub"><span>= Charges internes <em class="w" id="wCosts"></em></span><span class="v" id="rcCosts">0 €</span></div>
+            <div class="rc-row cost"><span>− Coût professionnel de santé <em class="w" id="wPds"></em></span><span class="v" id="rcPds">0 €</span></div>
+            <div class="rc-row cost"><span>− Coût gestion de projet <em class="w" id="wGestion"></em></span><span class="v" id="rcGestion">0 €</span></div>
+            <div class="rc-row cost"><span>− Coût frais annexes <em class="w" id="wFrais"></em></span><span class="v" id="rcFrais">0 €</span></div>
+            <div class="rc-row cost sub"><span>= Charges de mission <em class="w" id="wCosts"></em></span><span class="v" id="rcCosts">0 €</span></div>
             <hr class="rc-sep">
             <div class="rc-row gross"><span>= Marge brute</span><span class="v" id="rcGross">0 €</span></div>
           </div>
@@ -1206,9 +1256,11 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     view.className = "layout";
     view.innerHTML = DEVIS_HTML;
     setChip(syncChip.text, syncChip.cls);
-    buildMission(); buildCatalog(); buildFees(); renderPds(); renderGestion();
+    buildMission(); buildRecrutement(); buildCatalog(); renderGestionFact(); buildFees(); renderPds(); renderGestion(); renderChargesFrais();
+    $("#addGfact").addEventListener("click", () => { state.gestionFact.push({ id: uid("gf"), memberId: DATA.team[0] ? DATA.team[0].id : "", unit: "jour", qty: 1 }); renderGestionFact(); recompute(); });
     $("#addPds").addEventListener("click", () => { state.pds.push({ id: uid("pds"), mode: "forfait", prestationId: DATA.pdsForfait[0] ? DATA.pdsForfait[0].id : "", group: "specialiste", profileId: DATA.pdsProfiles[0] ? DATA.pdsProfiles[0].id : "", unit: "jour", qty: 1 }); renderPds(); recompute(); });
     $("#addGestion").addEventListener("click", () => { state.gestion.push({ id: uid("g"), memberId: DATA.team[0] ? DATA.team[0].id : "", unit: "jour", qty: 1 }); renderGestion(); recompute(); });
+    $("#addCfrais").addEventListener("click", () => { state.chargesFrais.push({ id: uid("cf"), label: "", qty: 1, cost: 0 }); renderChargesFrais(); recompute(); });
     bindSummary(); setupStepnav(); recompute();
   }
 
@@ -1308,71 +1360,108 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   }
   function refreshPdsRow(row, line) { const pu = pdsUnitPrice(line); const warn = pu <= 0 ? ' <span class="warn-zero">tarif 0 — voir « Tarifs »</span>' : ""; row.querySelector(".line-total").innerHTML = fmtEUR(pu) + "/u<br><b>" + fmtEUR(pu * line.qty) + "</b>" + warn; }
 
-  /* --- gestion (cost) --- */
+  /* --- lignes « équipe HYC » : gestion facturée (étape 2) et temps chargé (étape 3) --- */
   function gestionUnitPrice(l) { const m = DATA.team.find(x => x.id === l.memberId); if (!m) return 0; return l.unit === "heure" ? parseNum(m.rateHour) : parseNum(m.rateDay); }
-  function renderGestion() {
-    const host = $("#gestionList");
-    if (!state.gestion.length) { host.innerHTML = '<p class="empty">Ajoute le temps de gestion de l\u2019équipe (jours ou heures).</p>'; return; }
-    host.innerHTML = state.gestion.map(l => {
+  function renderTeamList(hostSel, list, opts) {
+    const host = $(hostSel);
+    if (!list.length) { host.innerHTML = '<p class="empty">' + opts.empty + "</p>"; return; }
+    host.innerHTML = list.map(l => {
       const pu = gestionUnitPrice(l);
-      return `<div class="dyn-row row-gestion" data-id="${esc(l.id)}">
-        <div class="field"><label>Gestionnaire</label><select data-f="memberId">${DATA.team.map(m => `<option value="${esc(m.id)}" ${m.id === l.memberId ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
+      return `<div class="dyn-row row-gestion${opts.rev ? " rev" : ""}" data-id="${esc(l.id)}">
+        <div class="field"><label>${opts.who}</label><select data-f="memberId">${DATA.team.map(m => `<option value="${esc(m.id)}" ${m.id === l.memberId ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
         <div class="field"><label>Unité</label><select data-f="unit"><option value="jour" ${l.unit === "jour" ? "selected" : ""}>Jour</option><option value="heure" ${l.unit === "heure" ? "selected" : ""}>Heure</option></select></div>
         <div class="field"><label>Quantité</label><input data-f="qty" type="number" min="0" step="0.5" value="${l.qty}"></div>
         <div class="line-total">${fmtEUR(pu)}/u<br><b>${fmtEUR(pu * l.qty)}</b></div>
         <button class="rm" type="button" aria-label="Supprimer">✕</button></div>`;
     }).join("");
     host.querySelectorAll(".dyn-row").forEach(row => {
-      const line = state.gestion.find(x => x.id === row.dataset.id);
+      const line = list.find(x => x.id === row.dataset.id);
       const refresh = () => { const pu = gestionUnitPrice(line); row.querySelector(".line-total").innerHTML = fmtEUR(pu) + "/u<br><b>" + fmtEUR(pu * line.qty) + "</b>"; };
       row.addEventListener("change", e => { const f = e.target.dataset.f; if (!f) return; line[f] = f === "qty" ? Math.max(0, parseNum(e.target.value)) : e.target.value; refresh(); recompute(); });
       row.addEventListener("input", e => { if (e.target.dataset.f !== "qty") return; line.qty = Math.max(0, parseNum(e.target.value)); refresh(); recompute(); });
-      row.querySelector(".rm").addEventListener("click", () => { state.gestion = state.gestion.filter(x => x.id !== line.id); renderGestion(); recompute(); });
+      row.querySelector(".rm").addEventListener("click", () => { opts.remove(line.id); recompute(); });
+    });
+  }
+  function renderGestionFact() {
+    renderTeamList("#gfactList", state.gestionFact, { who: "Gestionnaire", rev: true, empty: "Ajoute la gestion de projet facturée au client (jours ou heures).", remove: id => { state.gestionFact = state.gestionFact.filter(x => x.id !== id); renderGestionFact(); } });
+  }
+  function renderGestion() {
+    renderTeamList("#gestionList", state.gestion, { who: "Salarié HYC", empty: "Ajoute le temps chargé des salariés HYC mobilisés (jours ou heures).", remove: id => { state.gestion = state.gestion.filter(x => x.id !== id); renderGestion(); } });
+  }
+
+  /* --- coût frais annexes (étape 3) : prestataires externes, saisie libre --- */
+  function renderChargesFrais() {
+    const host = $("#cfraisList");
+    if (!state.chargesFrais.length) { host.innerHTML = '<p class="empty">Renseigne la rémunération des prestataires externes si tu as des éléments (devis prestataire, historique de coût…).</p>'; return; }
+    host.innerHTML = state.chargesFrais.map(l => `<div class="dyn-row row-cfrais" data-id="${esc(l.id)}">
+        <div class="field"><label>Prestataire / frais</label><input data-f="label" type="text" value="${esc(l.label)}" placeholder="Ex. Monteur vidéo — devis n° 124" autocomplete="off"></div>
+        <div class="field"><label>Quantité</label><input data-f="qty" type="number" min="0" step="0.5" value="${l.qty}"></div>
+        <div class="field"><label>Coût unitaire € HT</label><input data-f="cost" type="number" min="0" step="10" value="${l.cost}"></div>
+        <div class="line-total"><b>${fmtEUR(parseNum(l.cost) * parseNum(l.qty))}</b></div>
+        <button class="rm" type="button" aria-label="Supprimer">✕</button></div>`).join("");
+    host.querySelectorAll(".dyn-row").forEach(row => {
+      const line = state.chargesFrais.find(x => x.id === row.dataset.id);
+      row.addEventListener("input", e => {
+        const f = e.target.dataset.f; if (!f) return;
+        line[f] = f === "label" ? e.target.value : Math.max(0, parseNum(e.target.value));
+        row.querySelector(".line-total").innerHTML = "<b>" + fmtEUR(parseNum(line.cost) * parseNum(line.qty)) + "</b>";
+        recompute();
+      });
+      row.querySelector(".rm").addEventListener("click", () => { state.chargesFrais = state.chargesFrais.filter(x => x.id !== line.id); renderChargesFrais(); recompute(); });
     });
   }
 
-  /* --- frais (cost) --- */
-  function buildFees() {
-    const host = $("#feesList");
-    host.innerHTML = DATA.fees.map(f => {
-      const qty = state.fees[f.id], on = qty != null;
-      return `<div class="fee-row" data-id="${esc(f.id)}">
+  /* --- listes à cocher facturées (étape 2) : recrutement/sourcing PdS et frais annexes --- */
+  function itemPrice(f) { return parseNum(f.price != null ? f.price : f.cost); }
+  function buildCheckList(hostSel, itemsArr, stateMap) {
+    const host = $(hostSel);
+    if (!itemsArr.length) { host.innerHTML = '<p class="empty">Aucun élément — ajoute-les dans l&#39;onglet « Tarifs ».</p>'; return; }
+    host.innerHTML = itemsArr.map(f => {
+      const qty = stateMap[f.id], on = qty != null, pu = itemPrice(f);
+      return `<div class="fee-row rev" data-id="${esc(f.id)}">
         <label class="prod-label"><input type="checkbox" ${on ? "checked" : ""}><span class="txt"><span class="name">${esc(f.label)}</span><span class="desc">${esc(f.description || "")}</span></span></label>
-        <span class="prod-pu">${fmtEUR(f.cost)} <span class="unit">/ ${esc(shortUnit(f.unit))}</span></span>
+        <span class="prod-pu">${pu > 0 ? fmtEUR(pu) + ' <span class="unit">/ ' + esc(shortUnit(f.unit)) + "</span>" : '<span class="warn-zero">prix à définir</span>'}</span>
         <span class="prod-qty"><input type="number" min="0" step="0.5" value="${on ? qty : ""}" ${on ? "" : "disabled"} aria-label="Quantité"></span>
-        <span class="prod-total ${on ? "" : "zero"}">${on ? fmtEUR(f.cost * qty) : "—"}</span></div>`;
+        <span class="prod-total ${on ? "" : "zero"}">${on ? fmtEUR(pu * qty) : "—"}</span></div>`;
     }).join("");
+    const refreshRow = (row, f) => { const qty = stateMap[f.id], on = qty != null; const t = row.querySelector(".prod-total"); t.textContent = on ? fmtEUR(itemPrice(f) * qty) : "—"; t.classList.toggle("zero", !on); };
     host.addEventListener("change", e => {
       const row = e.target.closest(".fee-row"); if (!row) return;
-      const f = DATA.fees.find(x => x.id === row.dataset.id), qi = row.querySelector('input[type="number"]');
-      if (e.target.type === "checkbox") { if (e.target.checked) { const q = parseNum(qi.value) || 1; state.fees[f.id] = q; qi.disabled = false; qi.value = q; } else { delete state.fees[f.id]; qi.disabled = true; } }
-      refreshFeeRow(row, f); recompute();
+      const f = itemsArr.find(x => x.id === row.dataset.id), qi = row.querySelector('input[type="number"]');
+      if (e.target.type === "checkbox") { if (e.target.checked) { const q = parseNum(qi.value) || 1; stateMap[f.id] = q; qi.disabled = false; qi.value = q; } else { delete stateMap[f.id]; qi.disabled = true; } }
+      refreshRow(row, f); recompute();
     });
     host.addEventListener("input", e => {
       if (e.target.type !== "number") return;
-      const row = e.target.closest(".fee-row"), f = DATA.fees.find(x => x.id === row.dataset.id);
-      if (state.fees[f.id] == null) return; state.fees[f.id] = Math.max(0, parseNum(e.target.value)); refreshFeeRow(row, f); recompute();
+      const row = e.target.closest(".fee-row"), f = itemsArr.find(x => x.id === row.dataset.id);
+      if (stateMap[f.id] == null) return; stateMap[f.id] = Math.max(0, parseNum(e.target.value)); refreshRow(row, f); recompute();
     });
   }
-  function refreshFeeRow(row, f) { const qty = state.fees[f.id], on = qty != null; const t = row.querySelector(".prod-total"); t.textContent = on ? fmtEUR(f.cost * qty) : "—"; t.classList.toggle("zero", !on); }
+  function buildRecrutement() { buildCheckList("#recList", DATA.recrutement, state.recrutement); }
+  function buildFees() { buildCheckList("#feesList", DATA.fees, state.fees); }
 
-  /* --- calculs (modèle A) --- */
+  /* --- calculs ---
+     Étape 2 (recrutement, prestations, gestion facturée, frais annexes) = lignes du
+     devis client → CA. Étape 3 (coûts PdS, temps chargé, prestataires externes) =
+     charges de mission, jamais reportées sur le devis → marge = prix − charges. */
   function computeItems() {
     const items = [];
+    Object.keys(state.recrutement).forEach(id => { const f = DATA.recrutement.find(x => x.id === id); if (!f) return; const q = state.recrutement[id]; if (q <= 0) return; items.push({ section: "recrutement", label: f.label, description: f.description || "", qty: q, unit: f.unit, pu: itemPrice(f) }); });
     Object.keys(state.products).forEach(id => { const p = DATA.products.find(x => x.id === id); if (!p) return; const q = state.products[id]; if (q <= 0) return; items.push({ section: "prod", label: p.label, description: p.description, qty: q, unit: p.unit, pu: p.price }); });
-    state.pds.forEach(l => { if (l.qty <= 0) return; items.push({ section: "pds", label: pdsLabel(l), description: "", qty: l.qty, unit: l.mode === "temps" ? l.unit : "jour", pu: pdsUnitPrice(l) }); });
-    state.gestion.forEach(l => { if (l.qty <= 0) return; const m = DATA.team.find(x => x.id === l.memberId); items.push({ section: "gestion", label: "Gestion de projet — " + (m ? m.label : ""), description: "", qty: l.qty, unit: l.unit, pu: gestionUnitPrice(l) }); });
-    Object.keys(state.fees).forEach(id => { const f = DATA.fees.find(x => x.id === id); if (!f) return; const q = state.fees[id]; if (q <= 0) return; items.push({ section: "frais", label: f.label, description: f.description || "", qty: q, unit: f.unit, pu: f.cost }); });
+    state.gestionFact.forEach(l => { if (l.qty <= 0) return; const m = DATA.team.find(x => x.id === l.memberId); items.push({ section: "gestion", label: "Gestion de projet — " + (m ? m.label : ""), description: "", qty: l.qty, unit: l.unit, pu: gestionUnitPrice(l) }); });
+    Object.keys(state.fees).forEach(id => { const f = DATA.fees.find(x => x.id === id); if (!f) return; const q = state.fees[id]; if (q <= 0) return; items.push({ section: "frais", label: f.label, description: f.description || "", qty: q, unit: f.unit, pu: itemPrice(f) }); });
     return items;
   }
   function totals(items) {
-    let cat = 0, pds = 0, gestion = 0, frais = 0;
-    items.forEach(it => { const a = it.pu * it.qty; if (it.section === "prod") cat += a; else if (it.section === "pds") pds += a; else if (it.section === "gestion") gestion += a; else frais += a; });
-    // PdS, gestion et frais sont refacturés au client : ils entrent dans le CA du devis
-    // ET restent des charges internes pour le calcul de la marge.
-    const costs = round2(pds + gestion + frais);
-    const revenue = round2(cat + pds + gestion + frais);
-    return { catalogue: round2(cat), revenue, pds: round2(pds), gestion: round2(gestion), frais: round2(frais), costs };
+    let rec = 0, cat = 0, gfact = 0, frais = 0;
+    items.forEach(it => { const a = it.pu * it.qty; if (it.section === "recrutement") rec += a; else if (it.section === "prod") cat += a; else if (it.section === "gestion") gfact += a; else frais += a; });
+    const revenue = round2(rec + cat + gfact + frais);
+    let cPds = 0; state.pds.forEach(l => { cPds += pdsUnitPrice(l) * l.qty; });
+    let cGestion = 0; state.gestion.forEach(l => { cGestion += gestionUnitPrice(l) * l.qty; });
+    let cFrais = 0; state.chargesFrais.forEach(l => { cFrais += parseNum(l.cost) * parseNum(l.qty); });
+    const costs = round2(cPds + cGestion + cFrais);
+    return { recrutement: round2(rec), catalogue: round2(cat), gestionFact: round2(gfact), frais: round2(frais), revenue,
+             pds: round2(cPds), gestion: round2(cGestion), chargesFrais: round2(cFrais), costs };
   }
   function currentType() { return DATA.projectTypes.find(t => t.id === state.projectType) || null; }
 
@@ -1392,17 +1481,21 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     const CA = t.revenue, costs = t.costs;
     const price = state.price != null ? state.price : CA;
 
-    $("#revTot").textContent = fmtEUR(t.catalogue);
+    $("#revTot").textContent = fmtEUR(CA);
+    $("#recTot").textContent = fmtEUR(t.recrutement);
+    $("#prestaTot").textContent = fmtEUR(t.catalogue);
+    $("#gfactTot").textContent = fmtEUR(t.gestionFact);
+    $("#feesTot").textContent = fmtEUR(t.frais);
     $("#pdsTot").textContent = fmtEUR(t.pds);
     $("#gestionTot").textContent = fmtEUR(t.gestion);
-    $("#feesTot").textContent = fmtEUR(t.frais);
+    $("#cfraisTot").textContent = fmtEUR(t.chargesFrais);
     $("#costTot").textContent = fmtEUR(costs);
 
     const input = $("#priceFinal");
     if (updateField !== false) input.value = state.price != null ? String(state.price).replace(".", ",") : (CA ? String(CA).replace(".", ",") : "");
     $("#priceReset").hidden = state.price == null || round2(state.price) === CA;
     const remise = round2(CA - price);
-    $("#priceCap").innerHTML = "Total du devis (catalogue + refacturations) : <b>" + fmtEUR(CA) + "</b>" + (Math.abs(remise) >= 0.01 ? (remise > 0 ? " · remise " + fmtEUR(remise) : " · majoration " + fmtEUR(-remise)) : "");
+    $("#priceCap").innerHTML = "Total des prestations proposées : <b>" + fmtEUR(CA) + "</b>" + (Math.abs(remise) >= 0.01 ? (remise > 0 ? " · remise " + fmtEUR(remise) : " · majoration " + fmtEUR(-remise)) : "");
 
     const tva = parseNum(DATA.settings.tvaRate);
     $("#ttcBlock").innerHTML = price > 0
@@ -1410,15 +1503,17 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       : '<div class="tc-row"><span>Ajoute une prestation facturée</span><span class="v">—</span></div>';
 
     $("#rcRev").textContent = fmtEUR(CA);
+    $("#rcRec").textContent = fmtEUR(t.recrutement);
     $("#rcCat").textContent = fmtEUR(t.catalogue);
-    $("#rcRefac").textContent = fmtEUR(costs);
+    $("#rcGfact").textContent = fmtEUR(t.gestionFact);
+    $("#rcFees").textContent = fmtEUR(t.frais);
     $("#rcPds").textContent = fmtEUR(t.pds);
     $("#rcGestion").textContent = fmtEUR(t.gestion);
-    $("#rcFrais").textContent = fmtEUR(t.frais);
+    $("#rcFrais").textContent = fmtEUR(t.chargesFrais);
     $("#rcCosts").textContent = fmtEUR(costs);
     $("#rcGross").textContent = fmtEUR(price - costs);
     const wt = (id, v) => { const el = $(id); el.textContent = price > 0 && v > 0 ? fmtPct(v / price * 100) + " du CA" : ""; };
-    wt("#wPds", t.pds); wt("#wGestion", t.gestion); wt("#wFrais", t.frais); wt("#wCosts", costs);
+    wt("#wPds", t.pds); wt("#wGestion", t.gestion); wt("#wFrais", t.chargesFrais); wt("#wCosts", costs);
 
     renderKpis(price, costs);
 
@@ -1464,8 +1559,8 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function markSteps() {
     const set = (sel, done) => { const a = $(`.stepnav a[data-step="${sel}"]`); if (a) a.classList.toggle("done", !!done); };
     set("s-mission", state.client && state.projectType);
-    set("s-presta", Object.keys(state.products).length > 0);
-    set("s-couts", state.pds.length || state.gestion.length || Object.keys(state.fees).length);
+    set("s-presta", Object.keys(state.products).length || Object.keys(state.recrutement).length || state.gestionFact.length || Object.keys(state.fees).length);
+    set("s-couts", state.pds.length || state.gestion.length || state.chargesFrais.length);
   }
   function setupStepnav() {
     $$(".stepnav a").forEach(a => a.addEventListener("click", e => {
@@ -1480,7 +1575,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     }
   }
 
-  /* --- export PDF (devis client : toutes les lignes, y compris PdS/gestion/frais refacturés) --- */
+  /* --- export PDF (devis client : les lignes de l'étape 2 uniquement — les charges restent internes) --- */
   function exportPDF() {
     const items = computeItems(), t = totals(items);
     if (!items.length || t.revenue <= 0) { toast("Ajoute au moins une prestation avant d'exporter."); return; }
@@ -1512,7 +1607,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       totalTTC: round2(price * (1 + tva / 100)),
       chargesPds: t.pds,
       chargesGestion: t.gestion,
-      fraisAnnexes: t.frais,
+      fraisAnnexes: t.chargesFrais,
       totalCharges: t.costs,
       margeBrute: gross,
       tauxMarquePct: price > 0 ? round2(gross / price * 100) : "",
@@ -1562,6 +1657,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       L'outil recharge les derniers tarifs publiés à chaque ouverture de la page.</p>
     <nav class="tabs" id="tabs">
       <button class="tab" data-tab="marges" aria-selected="true">Marges</button>
+      <button class="tab" data-tab="recrutement" aria-selected="false">Recrutement / sourcing</button>
       <button class="tab" data-tab="catalogue" aria-selected="false">Catalogue (prix de vente)</button>
       <button class="tab" data-tab="forfait" aria-selected="false">PdS · forfait</button>
       <button class="tab" data-tab="temps" aria-selected="false">PdS · au temps</button>
@@ -1570,6 +1666,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
       <button class="tab" data-tab="reglages" aria-selected="false">Réglages</button>
     </nav>
     <section id="panel-marges" class="panel on"></section>
+    <section id="panel-recrutement" class="panel"></section>
     <section id="panel-catalogue" class="panel"></section>
     <section id="panel-forfait" class="panel"></section>
     <section id="panel-temps" class="panel"></section>
@@ -1593,7 +1690,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     renderAll(); bindSavebar();
   }
   function markDirty() { adirty = true; const s = $("#status"); if (s) { s.textContent = "Modifications appliquées — publication automatique dans 2 s…"; s.classList.remove("saved"); } schedulePublish(); }
-  function renderAll() { renderMarges(); renderCatalogue(); renderForfait(); renderTemps(); renderEquipe(); renderFrais(); renderReglages(); }
+  function renderAll() { renderMarges(); renderRecrutementAdmin(); renderCatalogue(); renderForfait(); renderTemps(); renderEquipe(); renderFrais(); renderReglages(); }
   function acard(title, hint, inner) { return `<div class="acard"><div class="acard-head"><h2>${title}</h2>${hint ? `<span class="hint">${hint}</span>` : ""}</div><div class="acard-body table-scroll">${inner}</div></div>`; }
   function numIn(v, path, step) { return `<input class="num" type="number" step="${step || 1}" min="0" value="${v == null ? "" : v}" data-path="${path}">`; }
   function txtIn(v, path, w) { return `<input type="text" value="${esc(v == null ? "" : v)}" data-path="${path}"${w ? ` style="min-width:${w}px"` : ""}>`; }
@@ -1608,6 +1705,13 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     const rows = DATA.projectTypes.map((t, i) => `<tr><td>${txtIn(t.label, `projectTypes.${i}.label`, 220)}</td><td>${numIn(t.margeVisee, `projectTypes.${i}.margeVisee`)}</td><td>${numIn(t.margeAcceptable, `projectTypes.${i}.margeAcceptable`)}</td><td>${numIn(t.margeDegradee, `projectTypes.${i}.margeDegradee`)}</td></tr>`).join("");
     const p = $("#panel-marges"); p.innerHTML = acard("Marges par type de projet", "En % du prix de vente HT", `<table class="grid"><thead><tr><th>Type de projet</th><th>Marge visée %</th><th>Acceptable %</th><th>Dégradée %</th></tr></thead><tbody>${rows}</tbody></table>`); bindPanel(p);
   }
+  function renderRecrutementAdmin() {
+    const unitOpts = u => ["forfait", "unité", "jour", "heure"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
+    const rows = DATA.recrutement.map((f, i) => `<tr><td>${txtIn(f.label, `recrutement.${i}.label`, 260)}</td><td><select data-path="recrutement.${i}.unit">${unitOpts(f.unit)}</select></td><td>${numIn(f.price, `recrutement.${i}.price`, 25)}</td><td>${txtIn(f.description, `recrutement.${i}.description`, 300)}</td><td><button class="rm" data-del="recrutement" data-i="${i}">✕</button></td></tr>`).join("");
+    const p = $("#panel-recrutement"); p.innerHTML = acard("Recrutement / sourcing PdS — facturé au client", "Section 1 de l'étape « Prestations proposées » du devis.", `<table class="grid"><thead><tr><th>Prestation</th><th>Unité</th><th>Prix de vente € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="rec" style="margin-top:12px">＋ Ajouter</button>`);
+    bindPanel(p); bindRowActions(p, renderRecrutementAdmin);
+    p.querySelector('[data-add="rec"]').addEventListener("click", () => { DATA.recrutement.push({ id: uid("rec"), label: "Nouvelle prestation de sourcing", unit: "forfait", price: 0, description: "" }); markDirty(); renderRecrutementAdmin(); });
+  }
   function renderCatalogue() {
     const catOpts = c => DATA.categories.map(x => `<option ${x === c ? "selected" : ""}>${esc(x)}</option>`).join("");
     const unitOpts = u => ["unité", "heure", "jour", "forfait"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
@@ -1619,7 +1723,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function renderForfait() {
     const typeOpts = t => ["Formation", "Communication", "Marketing", "Expertise"].map(x => `<option ${x === t ? "selected" : ""}>${x}</option>`).join("");
     const rows = DATA.pdsForfait.map((f, i) => `<tr><td><select data-path="pdsForfait.${i}.projectType">${typeOpts(f.projectType)}</select></td><td>${txtIn(f.label, `pdsForfait.${i}.label`, 220)}</td><td>${numIn(f.rates.generaliste, `pdsForfait.${i}.rates.generaliste`, 50)}</td><td>${numIn(f.rates.specialiste, `pdsForfait.${i}.rates.specialiste`, 50)}</td><td>${numIn(f.rates.paramedical, `pdsForfait.${i}.rates.paramedical`, 50)}</td><td><button class="rm" data-del="pdsForfait" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-forfait"); p.innerHTML = acard("Rémunération PdS — forfait/jour", "Refacturé au client sur le devis · compté en charge interne pour la marge · un tarif à 0 déclenche une alerte", `<table class="grid"><thead><tr><th>Type</th><th>Prestation</th><th>Généraliste €</th><th>Spécialiste €</th><th>Paramédical €</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="forfait" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-forfait"); p.innerHTML = acard("Rémunération PdS — forfait/jour", "Charge de mission (étape 3 du devis) · un tarif à 0 déclenche une alerte", `<table class="grid"><thead><tr><th>Type</th><th>Prestation</th><th>Généraliste €</th><th>Spécialiste €</th><th>Paramédical €</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="forfait" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderForfait);
     p.querySelector('[data-add="forfait"]').addEventListener("click", () => { DATA.pdsForfait.push({ id: uid("pf"), projectType: "Formation", label: "Nouvelle prestation", rates: { generaliste: 0, specialiste: 0, paramedical: 0 } }); markDirty(); renderForfait(); });
   }
@@ -1632,14 +1736,14 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   }
   function renderEquipe() {
     const rows = DATA.team.map((m, i) => `<tr><td>${txtIn(m.label, `team.${i}.label`, 180)}</td><td>${numIn(m.rateHour, `team.${i}.rateHour`, 5)}</td><td>${numIn(m.rateDay, `team.${i}.rateDay`, 25)}</td><td><button class="rm" data-del="team" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-equipe"); p.innerHTML = acard("Équipe projet — temps de gestion", "Refacturé au client sur le devis · compté en charge interne · coût jour = coût horaire × 7", `<table class="grid"><thead><tr><th>Gestionnaire</th><th>Coût € / heure</th><th>Coût € / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="member" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-equipe"); p.innerHTML = acard("Équipe projet — gestion de projet", "Tarifs utilisés pour la gestion de projet facturée (étape 2) et le temps chargé des salariés HYC (étape 3) · coût jour = coût horaire × 7", `<table class="grid"><thead><tr><th>Gestionnaire</th><th>Coût € / heure</th><th>Coût € / jour</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="member" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderEquipe);
     p.querySelector('[data-add="member"]').addEventListener("click", () => { DATA.team.push({ id: uid("tm"), label: "Nouveau membre", rateHour: 0, rateDay: 0 }); markDirty(); renderEquipe(); });
   }
   function renderFrais() {
     const unitOpts = u => ["forfait", "jour", "heure", "unité"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("");
     const rows = DATA.fees.map((f, i) => `<tr><td>${txtIn(f.label, `fees.${i}.label`, 260)}</td><td><select data-path="fees.${i}.unit">${unitOpts(f.unit)}</select></td><td>${numIn(f.cost, `fees.${i}.cost`, 25)}</td><td>${txtIn(f.description, `fees.${i}.description`, 300)}</td><td><button class="rm" data-del="fees" data-i="${i}">✕</button></td></tr>`).join("");
-    const p = $("#panel-frais"); p.innerHTML = acard("Frais annexes — refacturés", "Déplacements, montage vidéo (sous-traitance), sourcing… Refacturés au client et comptés en charge interne.", `<table class="grid"><thead><tr><th>Frais</th><th>Unité</th><th>Coût € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="fee" style="margin-top:12px">＋ Ajouter</button>`);
+    const p = $("#panel-frais"); p.innerHTML = acard("Frais annexes — facturés au client", "Déplacements, montage vidéo… Section 4 de l'étape « Prestations proposées » du devis. Le coût réel des prestataires se saisit dans l'étape « Charges de mission ».", `<table class="grid"><thead><tr><th>Frais</th><th>Unité</th><th>Prix de vente € HT</th><th>Description (devis)</th><th></th></tr></thead><tbody>${rows}</tbody></table><button class="btn btn-sm btn-add" data-add="fee" style="margin-top:12px">＋ Ajouter</button>`);
     bindPanel(p); bindRowActions(p, renderFrais);
     p.querySelector('[data-add="fee"]').addEventListener("click", () => { DATA.fees.push({ id: uid("fe"), label: "Nouveau frais", unit: "forfait", cost: 0, description: "" }); markDirty(); renderFrais(); });
   }
@@ -1661,7 +1765,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
   function bindSavebar() {
     $("#btnSave").addEventListener("click", () => { adirty = false; const s = $("#status"); s.textContent = "Appliqué au devis"; s.classList.add("saved"); toast("Modifications prises en compte dans le devis."); publishConfig(); });
     $("#btnExport2").addEventListener("click", () => {
-      const banner = "/* HYC — données du générateur de devis (modèle : catalogue = prix de vente, PdS/gestion/frais = coûts).\n   Exporté depuis l'aperçu le " + todayFR() + ". Remplacer data.js à la racine du dépôt pour publier. */\n";
+      const banner = "/* HYC — données du générateur de devis (étape 2 = prestations facturées au client, étape 3 = charges de mission).\n   Exporté depuis l'aperçu le " + todayFR() + ". Remplacer data.js à la racine du dépôt pour publier. */\n";
       const content = banner + "window.HYC_DEFAULT_DATA = " + JSON.stringify(DATA, null, 2) + ";\n";
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([content], { type: "text/javascript;charset=utf-8" })); a.download = "data.js"; a.click(); URL.revokeObjectURL(a.href);
       toast("data.js exporté — remplace-le sur GitHub pour publier.");
@@ -1669,7 +1773,7 @@ table.grid .rm:hover { color: var(--red); background: var(--red-bg); }
     $("#btnImport").addEventListener("click", () => $("#fileImport").click());
     $("#fileImport").addEventListener("change", e => {
       const file = e.target.files[0]; if (!file) return; const r = new FileReader();
-      r.onload = () => { try { let txt = String(r.result).trim().replace(/^[\s\S]*?window\.HYC_DEFAULT_DATA\s*=\s*/, "").replace(/;\s*$/, ""); const parsed = JSON.parse(txt); if (!parsed.products || !parsed.projectTypes) throw 0; DATA = parsed; markDirty(); mountAdmin(); toast("Fichier importé et appliqué."); } catch (err) { toast("Import impossible : data.js ou JSON attendu."); } };
+      r.onload = () => { try { let txt = String(r.result).trim().replace(/^[\s\S]*?window\.HYC_DEFAULT_DATA\s*=\s*/, "").replace(/;\s*$/, ""); const parsed = JSON.parse(txt); if (!parsed.products || !parsed.projectTypes) throw 0; DATA = migrateData(parsed); markDirty(); mountAdmin(); toast("Fichier importé et appliqué."); } catch (err) { toast("Import impossible : data.js ou JSON attendu."); } };
       r.readAsText(file); e.target.value = "";
     });
     $("#btnResetData").addEventListener("click", () => { if (!confirm("Revenir aux tarifs par défaut ? Ils seront publiés à toute l'équipe.")) return; DATA = deepClone(DEFAULT); mountAdmin(); toast("Tarifs par défaut restaurés."); schedulePublish(); });
